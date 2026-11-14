@@ -76,7 +76,7 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
                 }
                 MirrorPrefs.ACTION_PREFS_CHANGED -> {
                     if (::windowManager.isInitialized) {
-                        applyButtonPosition()
+                        applyButtonAppearance()
                         updateLockButtonVisibility()
                         maskedCard?.let { configurePopupLayoutAndShape(it) }
                     }
@@ -249,7 +249,10 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         val params = buttonParams ?: return
         val (screenW, screenH) = getRealScreenSize()
         val density = resources.displayMetrics.density
-        val btnSize = (54 * density).toInt()
+        val btnSize = (MirrorPrefs.getButtonSizeDp(this) * density).toInt()
+
+        params.width = btnSize
+        params.height = btnSize
 
         val xRatio = MirrorPrefs.getButtonXRatio(this)
         val yRatio = MirrorPrefs.getButtonYRatio(this)
@@ -263,12 +266,18 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         }
     }
 
+    private fun applyButtonAppearance() {
+        val view = buttonView ?: return
+        view.alpha = MirrorPrefs.getButtonAlpha(this)
+        applyButtonPosition()
+    }
+
     private fun ensureButtonCreated() {
         if (buttonView != null) return
 
         val view = LayoutInflater.from(this).inflate(R.layout.overlay_lock_button, null)
         val density = resources.displayMetrics.density
-        val btnSize = (54 * density).toInt()
+        val btnSize = (MirrorPrefs.getButtonSizeDp(this) * density).toInt()
 
         val params = WindowManager.LayoutParams(
             btnSize,
@@ -283,6 +292,7 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
 
         buttonView = view
         buttonParams = params
+        view.alpha = MirrorPrefs.getButtonAlpha(this)
         applyButtonPosition()
 
         view.setOnTouchListener { v, event ->

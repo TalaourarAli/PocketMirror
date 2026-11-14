@@ -29,6 +29,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sbPopupSize: SeekBar
     private lateinit var btnResetPopupPos: Button
     private lateinit var btnConfigurePosition: Button
+    private lateinit var tvButtonSize: TextView
+    private lateinit var sbButtonSize: SeekBar
+    private lateinit var tvButtonAlpha: TextView
+    private lateinit var sbButtonAlpha: SeekBar
     private lateinit var switchTestAlways: SwitchMaterial
 
     private val cameraLauncher = registerForActivityResult(
@@ -54,6 +58,10 @@ class MainActivity : AppCompatActivity() {
         sbPopupSize = findViewById(R.id.sbPopupSize)
         btnResetPopupPos = findViewById(R.id.btnResetPopupPos)
         btnConfigurePosition = findViewById(R.id.btnConfigurePosition)
+        tvButtonSize = findViewById(R.id.tvButtonSize)
+        sbButtonSize = findViewById(R.id.sbButtonSize)
+        tvButtonAlpha = findViewById(R.id.tvButtonAlpha)
+        sbButtonAlpha = findViewById(R.id.sbButtonAlpha)
         switchTestAlways = findViewById(R.id.switchTestAlways)
 
         btnCameraPerm.setOnClickListener {
@@ -99,11 +107,66 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, ButtonPositionActivity::class.java))
         }
 
+        setupButtonAppearanceSliders()
+
         switchTestAlways.isChecked = MirrorPrefs.getTestShowAlways(this)
         switchTestAlways.setOnCheckedChangeListener { _, isChecked ->
             MirrorPrefs.setTestShowAlways(this, isChecked)
             notifyServicePrefsChanged()
         }
+    }
+
+    private fun setupButtonAppearanceSliders() {
+        // Taille : 36..84 dp (progress 0..48)
+        val initSize = MirrorPrefs.getButtonSizeDp(this)
+        sbButtonSize.progress = (initSize - 36).coerceIn(0, 48)
+        updateButtonSizeLabel(initSize)
+
+        sbButtonSize.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val dp = progress + 36
+                updateButtonSizeLabel(dp)
+                if (fromUser) {
+                    MirrorPrefs.setButtonSizeDp(this@MainActivity, dp)
+                    notifyServicePrefsChanged()
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        // Transparence : 20..100 % (progress 0..80 => alpha 0.2..1.0)
+        val initAlpha = MirrorPrefs.getButtonAlpha(this)
+        sbButtonAlpha.progress = ((initAlpha * 100f).toInt() - 20).coerceIn(0, 80)
+        updateButtonAlphaLabel(initAlpha)
+
+        sbButtonAlpha.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val alpha = (progress + 20) / 100f
+                updateButtonAlphaLabel(alpha)
+                if (fromUser) {
+                    MirrorPrefs.setButtonAlpha(this@MainActivity, alpha)
+                    notifyServicePrefsChanged()
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+    }
+
+    private fun updateButtonSizeLabel(dp: Int) {
+        tvButtonSize.text = "Taille du bouton : $dp dp"
+    }
+
+    private fun updateButtonAlphaLabel(alpha: Float) {
+        val percent = (alpha * 100).toInt()
+        val hint = when {
+            percent >= 95 -> "opaque"
+            percent >= 60 -> "léger"
+            percent >= 35 -> "discret"
+            else -> "très discret"
+        }
+        tvButtonAlpha.text = "Transparence du bouton : $percent % ($hint)"
     }
 
     private fun setupPopupSliders() {

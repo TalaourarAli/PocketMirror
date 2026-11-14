@@ -13,6 +13,8 @@ object MirrorPrefs {
     private const val KEY_POPUP_OFFSET_X_DP = "popup_offset_x_dp"
     private const val KEY_POPUP_OFFSET_Y_DP = "popup_offset_y_dp"
     private const val KEY_POPUP_SIZE_DP = "popup_size_dp"
+    private const val KEY_BTN_SIZE_DP = "button_size_dp"
+    private const val KEY_BTN_ALPHA = "button_alpha"
     private const val KEY_TEST_ALWAYS = "test_show_always"
 
     const val MODE_HOLD = "HOLD"
@@ -79,5 +81,21 @@ object MirrorPrefs {
 
     fun setTestShowAlways(context: Context, value: Boolean) {
         prefs(context).edit().putBoolean(KEY_TEST_ALWAYS, value).apply()
+    }
+
+    // Taille du bouton flottant sur l'écran de verrouillage (en dp)
+    fun getButtonSizeDp(context: Context): Int =
+        prefs(context).getInt(KEY_BTN_SIZE_DP, 54)
+
+    fun setButtonSizeDp(context: Context, dp: Int) {
+        prefs(context).edit().putInt(KEY_BTN_SIZE_DP, dp.coerceIn(36, 84)).apply()
+    }
+
+    // Transparence du bouton (1.0 = opaque, 0.2 = très discret)
+    fun getButtonAlpha(context: Context): Float =
+        prefs(context).getFloat(KEY_BTN_ALPHA, 1f)
+
+    fun setButtonAlpha(context: Context, alpha: Float) {
+        prefs(context).edit().putFloat(KEY_BTN_ALPHA, alpha.coerceIn(0.2f, 1f)).apply()
     }
 }

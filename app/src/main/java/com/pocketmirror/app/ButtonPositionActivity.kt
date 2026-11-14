@@ -32,6 +32,14 @@ class ButtonPositionActivity : AppCompatActivity() {
 
         rootLayout = findViewById(R.id.buttonConfigRoot)
         draggableButton = findViewById(R.id.draggableButtonPreview)
+
+        // Aperçu à la taille réelle configurée
+        val btnSizePx = (MirrorPrefs.getButtonSizeDp(this) * resources.displayMetrics.density).toInt()
+        draggableButton.layoutParams = draggableButton.layoutParams.apply {
+            width = btnSizePx
+            height = btnSizePx
+        }
+        draggableButton.alpha = MirrorPrefs.getButtonAlpha(this)
         val btnReset = findViewById<Button>(R.id.btnResetPosition)
         val btnSave = findViewById<Button>(R.id.btnSavePosition)
 
