@@ -2,6 +2,9 @@
 build/
 app/build/
 local.properties
+keystore.properties
+*.keystore
+*.jks
 *.iml
 .idea/
 captures/
