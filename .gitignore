@@ -9,3 +9,6 @@ keystore.properties
 .idea/
 captures/
 .cxx/
+*.apk
+*.aab
+.DS_Store
