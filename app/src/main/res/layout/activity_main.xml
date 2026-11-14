@@ -1,67 +1,186 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#0F1016"
-    android:gravity="center"
-    android:orientation="vertical"
-    android:padding="24dp">
+    android:fillViewport="true">
 
-    <ImageView
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:background="@drawable/bg_lock_shortcut"
-        android:padding="14dp"
-        android:src="@drawable/ic_mirror" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Instant Mirror"
-        android:textColor="#FFFFFF"
-        android:textSize="26sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:gravity="center"
-        android:text="Maintenez le bouton en bas de l'écran de verrouillage pour afficher le miroir circulaire sous la caméra."
-        android:textColor="#A0A4B8"
-        android:textSize="14sp" />
-
-    <TextView
-        android:id="@+id/tvStatus"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="28dp"
-        android:background="#1B1D29"
-        android:padding="16dp"
-        android:textColor="#E8EAF6"
-        android:textSize="14sp" />
+        android:orientation="vertical"
+        android:padding="22dp">
 
-    <Button
-        android:id="@+id/btnCameraPerm"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:text="1. Autoriser la caméra" />
+        <!-- En-tête -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-    <Button
-        android:id="@+id/btnAccessibility"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="2. Activer sur l'écran de verrouillage" />
+            <ImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_lock_shortcut"
+                android:padding="12dp"
+                android:src="@drawable/ic_mirror" />
 
-    <com.google.android.material.switchmaterial.SwitchMaterial
-        android:id="@+id/switchTestAlways"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:text="Afficher aussi déverrouillé (pour tester)"
-        android:textColor="#D0D4E8" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:orientation="vertical">
 
-</LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Instant Mirror"
+                    android:textColor="#FFFFFF"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Miroir rapide sur écran verrouillé"
+                    android:textColor="#9AA0B8"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Statut & Permissions -->
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="#1B1D29"
+            android:padding="14dp"
+            android:textColor="#E8EAF6"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnCameraPerm"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:text="Caméra" />
+
+            <Button
+                android:id="@+id/btnAccessibility"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:text="Service Lockscreen" />
+        </LinearLayout>
+
+        <!-- Option 1 : Comportement du bouton -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Mode d'ouverture du miroir"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <RadioGroup
+            android:id="@+id/rgInteractionMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#1B1D29"
+            android:padding="10dp">
+
+            <RadioButton
+                android:id="@+id/rbModeHold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Maintenir appuyé (relâcher pour fermer)"
+                android:textColor="#E8EAF6" />
+
+            <RadioButton
+                android:id="@+id/rbModeToggle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Interrupteur (1 appui ouvre / 1 appui ferme)"
+                android:textColor="#E8EAF6" />
+        </RadioGroup>
+
+        <!-- Option 2 : Forme de la popup caméra -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Forme de la popup caméra"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <RadioGroup
+            android:id="@+id/rgMirrorShape"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#1B1D29"
+            android:padding="10dp">
+
+            <RadioButton
+                android:id="@+id/rbShapeCircle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Cercle (classique sous la caméra)"
+                android:textColor="#E8EAF6" />
+
+            <RadioButton
+                android:id="@+id/rbShapeRoundedSq"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Carré aux coins arrondis"
+                android:textColor="#E8EAF6" />
+
+            <RadioButton
+                android:id="@+id/rbShapePill"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Ovale vertical (Portrait grand format)"
+                android:textColor="#E8EAF6" />
+        </RadioGroup>
+
+        <!-- Option 3 : Emplacement du bouton -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Position sur l'écran de verrouillage"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnConfigurePosition"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Configurer l'emplacement du bouton" />
+
+        <!-- Mode test déverrouillé -->
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchTestAlways"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Afficher aussi déverrouillé (pour tester)"
+            android:textColor="#D0D4E8" />
+
+    </LinearLayout>
+</ScrollView>

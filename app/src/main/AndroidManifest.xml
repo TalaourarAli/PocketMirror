@@ -21,6 +21,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ButtonPositionActivity"
+            android:exported="false"
+            android:label="Emplacement du bouton" />
+
         <service
             android:name=".LockScreenMirrorAccessibilityService"
             android:exported="true"

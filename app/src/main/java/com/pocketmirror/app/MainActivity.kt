@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
+import android.widget.RadioGroup
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -17,6 +18,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvStatus: TextView
     private lateinit var btnCameraPerm: Button
     private lateinit var btnAccessibility: Button
+    private lateinit var rgInteractionMode: RadioGroup
+    private lateinit var rgMirrorShape: RadioGroup
+    private lateinit var btnConfigurePosition: Button
     private lateinit var switchTestAlways: SwitchMaterial
 
     private val cameraLauncher = registerForActivityResult(
@@ -32,6 +36,9 @@ class MainActivity : AppCompatActivity() {
         tvStatus = findViewById(R.id.tvStatus)
         btnCameraPerm = findViewById(R.id.btnCameraPerm)
         btnAccessibility = findViewById(R.id.btnAccessibility)
+        rgInteractionMode = findViewById(R.id.rgInteractionMode)
+        rgMirrorShape = findViewById(R.id.rgMirrorShape)
+        btnConfigurePosition = findViewById(R.id.btnConfigurePosition)
         switchTestAlways = findViewById(R.id.switchTestAlways)
 
         btnCameraPerm.setOnClickListener {
@@ -42,16 +49,56 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
 
-        switchTestAlways.isChecked = LockScreenMirrorAccessibilityService.testShowAlways
+        // Initialiser le mode d'ouverture
+        when (MirrorPrefs.getInteractionMode(this)) {
+            MirrorPrefs.MODE_TOGGLE -> rgInteractionMode.check(R.id.rbModeToggle)
+            else -> rgInteractionMode.check(R.id.rbModeHold)
+        }
+        rgInteractionMode.setOnCheckedChangeListener { _, checkedId ->
+            val mode = if (checkedId == R.id.rbModeToggle) {
+                MirrorPrefs.MODE_TOGGLE
+            } else {
+                MirrorPrefs.MODE_HOLD
+            }
+            MirrorPrefs.setInteractionMode(this, mode)
+            notifyServicePrefsChanged()
+        }
+
+        // Initialiser la forme
+        when (MirrorPrefs.getMirrorShape(this)) {
+            MirrorPrefs.SHAPE_ROUNDED_SQ -> rgMirrorShape.check(R.id.rbShapeRoundedSq)
+            MirrorPrefs.SHAPE_PILL -> rgMirrorShape.check(R.id.rbShapePill)
+            else -> rgMirrorShape.check(R.id.rbShapeCircle)
+        }
+        rgMirrorShape.setOnCheckedChangeListener { _, checkedId ->
+            val shape = when (checkedId) {
+                R.id.rbShapeRoundedSq -> MirrorPrefs.SHAPE_ROUNDED_SQ
+                R.id.rbShapePill -> MirrorPrefs.SHAPE_PILL
+                else -> MirrorPrefs.SHAPE_CIRCLE
+            }
+            MirrorPrefs.setMirrorShape(this, shape)
+            notifyServicePrefsChanged()
+        }
+
+        // Page dédiée à l'emplacement du bouton
+        btnConfigurePosition.setOnClickListener {
+            startActivity(Intent(this, ButtonPositionActivity::class.java))
+        }
+
+        switchTestAlways.isChecked = MirrorPrefs.getTestShowAlways(this)
         switchTestAlways.setOnCheckedChangeListener { _, isChecked ->
-            LockScreenMirrorAccessibilityService.testShowAlways = isChecked
-            sendBroadcast(Intent(Intent.ACTION_USER_PRESENT))
+            MirrorPrefs.setTestShowAlways(this, isChecked)
+            notifyServicePrefsChanged()
         }
     }
 
     override fun onResume() {
         super.onResume()
         updateUi()
+    }
+
+    private fun notifyServicePrefsChanged() {
+        sendBroadcast(Intent(MirrorPrefs.ACTION_PREFS_CHANGED).setPackage(packageName))
     }
 
     private fun hasCameraPermission(): Boolean =
@@ -75,15 +122,10 @@ class MainActivity : AppCompatActivity() {
         tvStatus.text = buildString {
             append("Caméra frontale : ")
             appendLine(if (camOk) "✅ Autorisée" else "❌ À autoriser")
-            append("Bouton écran verrouillé : ")
-            append(if (accOk) "✅ Actif (Press & hold en bas)" else "❌ Inactif")
+            append("Service écran verrouillé : ")
+            append(if (accOk) "✅ Actif" else "❌ Inactif")
         }
 
         btnCameraPerm.isEnabled = !camOk
-        btnAccessibility.text = if (accOk) {
-            "Paramètres écran verrouillé (Actif)"
-        } else {
-            "2. Activer sur l'écran de verrouillage"
-        }
     }
 }
