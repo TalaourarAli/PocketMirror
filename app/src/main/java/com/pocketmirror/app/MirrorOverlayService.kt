@@ -230,17 +230,20 @@ class MirrorOverlayService : LifecycleService() {
     }
 
     private fun buildNotification(): Notification {
-        val openAppIntent = PendingIntent.getActivity(
+        val openMirrorIntent = PendingIntent.getActivity(
             this,
             0,
-            Intent(this, MainActivity::class.java),
+            Intent(this, MirrorLockActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
             PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("PocketMirror actif")
-            .setContentText("Le bouton miroir est affiché sur l'écran.")
+            .setContentTitle("PocketMirror")
+            .setContentText("Appuyez pour ouvrir le miroir sur l'écran de verrouillage")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
-            .setContentIntent(openAppIntent)
+            .setContentIntent(openMirrorIntent)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .build()
     }

@@ -27,6 +27,15 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".MirrorLockActivity"
+            android:exported="true"
+            android:label="Miroir rapide"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:theme="@style/Theme.PocketMirror.Overlay"
+            android:turnScreenOn="true" />
+
         <service
             android:name=".MirrorOverlayService"
             android:exported="false"
