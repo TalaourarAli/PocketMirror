@@ -10,8 +10,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
 import android.os.Build
+import android.os.PowerManager
 import android.util.Log
+import android.view.Display
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -112,6 +115,22 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         } else {
             registerReceiver(debugReceiver, debugFilter)
         }
+
+        // Réagit aux passages écran allumé <-> AOD <-> éteint (AOD = STATE_DOZE)
+        getSystemService(DisplayManager::class.java)?.registerDisplayListener(
+            displayListener,
+            null
+        )
+    }
+
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) {}
+        override fun onDisplayRemoved(displayId: Int) {}
+        override fun onDisplayChanged(displayId: Int) {
+            if (displayId == Display.DEFAULT_DISPLAY) {
+                updateLockButtonVisibility()
+            }
+        }
     }
 
     private val debugReceiver = object : BroadcastReceiver() {
@@ -145,6 +164,9 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         runCatching { unregisterReceiver(systemReceiver) }
         runCatching { unregisterReceiver(debugReceiver) }
+        runCatching {
+            getSystemService(DisplayManager::class.java)?.unregisterDisplayListener(displayListener)
+        }
         closeMirrorImmediate()
         removeOverlayWindow()
         releaseCamera()
@@ -184,9 +206,28 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         return 0
     }
 
+    /**
+     * Vrai uniquement si l'écran est réellement allumé (STATE_ON et appareil interactif).
+     * En Always-On Display (AOD), le display est en STATE_DOZE / DOZE_SUSPEND
+     * et PowerManager.isInteractive est false -> on considère l'écran comme éteint.
+     */
+    private fun isDisplayReallyOn(): Boolean {
+        val power = getSystemService(POWER_SERVICE) as PowerManager
+        if (!power.isInteractive) return false
+
+        val display = getSystemService(DisplayManager::class.java)
+            ?.getDisplay(Display.DEFAULT_DISPLAY) ?: return false
+
+        @Suppress("DEPRECATION")
+        val state = display.state
+        return state == Display.STATE_ON
+    }
+
     private fun updateLockButtonVisibility(warmCamera: Boolean = true) {
         val btn = buttonView ?: return
-        val shouldShow = keyguardManager.isKeyguardLocked || MirrorPrefs.getTestShowAlways(this)
+        val displayOn = isDisplayReallyOn()
+        val shouldShow = displayOn &&
+            (keyguardManager.isKeyguardLocked || MirrorPrefs.getTestShowAlways(this))
         btn.visibility = if (shouldShow) View.VISIBLE else View.GONE
 
         if (shouldShow) {
@@ -195,6 +236,7 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
             ensureOverlayWindow()
             if (warmCamera) preWarmCamera()
         } else {
+            // Écran éteint, AOD, ou téléphone déverrouillé : aucune activité caméra
             if (isMirrorOpen) {
                 closeMirrorImmediate()
             }
