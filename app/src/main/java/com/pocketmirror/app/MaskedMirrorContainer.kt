@@ -67,7 +67,18 @@ class MaskedMirrorContainer @JvmOverloads constructor(
     }
 
     override fun dispatchDraw(canvas: Canvas) {
-        if (revealProgress <= 0.005f || width == 0 || height == 0) return
+        if (width == 0 || height == 0) return
+
+        // Si progress <= 0, on ne dessine rien à l'écran MAIS il ne faut surtout pas bloquer
+        // l'initialisation du SurfaceTexture interne de TextureView au 1er layout !
+        // On laisse donc au moins un alpha/scale infime ou on clippe hors champ tant que revealProgress == 0f
+        if (revealProgress <= 0.005f) {
+            val s = canvas.save()
+            canvas.clipRect(0f, 0f, 0f, 0f)
+            super.dispatchDraw(canvas)
+            canvas.restoreToCount(s)
+            return
+        }
 
         val saveCount = canvas.save()
 
