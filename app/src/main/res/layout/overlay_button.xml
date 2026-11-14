@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/floatingRoot"
+    android:layout_width="56dp"
+    android:layout_height="56dp"
+    android:background="@drawable/bg_floating_button"
+    android:elevation="8dp">
+
+    <ImageView
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_gravity="center"
+        android:contentDescription="Ouvrir le miroir"
+        android:src="@android:drawable/ic_menu_camera"
+        android:tint="#FFFFFF" />
+</FrameLayout>
