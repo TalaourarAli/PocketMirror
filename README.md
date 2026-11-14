@@ -59,7 +59,7 @@ ouvert.
 ### Depuis les sources
 
 ```bash
-git clone https://github.com/<votre-compte>/PocketMirror.git
+git clone https://github.com/TalaourarAli/PocketMirror.git
 cd PocketMirror
 ./gradlew :app:assembleDebug          # APK de debug, installable directement
 ./gradlew :app:assembleRelease        # APK de release (voir signature ci-dessous)
@@ -115,15 +115,14 @@ verrouiller l'écran.
 
 ## Intégration continue et releases
 
-Deux workflows GitHub Actions sont fournis :
-
 | Workflow | Déclencheur | Ce qu'il fait |
 |---|---|---|
-| `.github/workflows/android.yml` | push sur `master`/`main`, pull request, manuel | `assembleDebug` + `lintDebug`, APK de debug en artefact. **Ne publie rien.** |
-| `.github/workflows/release.yml` | push d'un tag `v*`, manuel | Vérifie que le tag correspond à `versionName`, construit l'APK de **release**, le signe si les secrets sont présents, puis crée une **GitHub Release** avec notes générées et APK attaché |
+| `.github/workflows/android.yml` | push sur `main`, pull request, manuel | `assembleDebug` + `lintDebug`, APK de debug en artefact. **Ne publie rien.** |
+| `.github/workflows/release.yml` | **manuel uniquement** | Construit l'APK de release, le signe si les secrets existent, et crée une GitHub Release avec notes générées et APK attaché |
 
-Autrement dit : **pousser du code ne publie pas de release**, seul le push d'un
-tag le fait.
+Les releases sont donc **signées localement, à la main**, avec un keystore qui
+ne quitte jamais la machine de l'auteur. Pousser du code ne publie rien, et
+pousser un tag ne publie rien non plus : c'est volontaire.
 
 ### Publier une version
 
@@ -132,18 +131,29 @@ tag le fait.
 
    ```bash
    git tag -a v1.8 -m "Version 1.8 (versionCode 8)"
-   git push origin master        # ou main
+   git push origin main
    git push origin v1.8          # ou: git push --tags
    ```
 
-3. Le workflow `Release` vérifie la cohérence tag / `versionName`, construit
-   l'APK et le publie sur la page Releases du dépôt.
+3. Construire l'APK signé en local :
 
-### Secrets de signature (fortement recommandés)
+   ```bash
+   ./gradlew :app:assembleRelease
+   ```
 
-Sans eux, la release est publiée avec un APK **non signé** ; Android refuse
-d'ailleurs d'installer un APK non signé par-dessus une version déjà installée.
-À ajouter dans **Settings → Secrets and variables → Actions** :
+4. Sur GitHub : **Releases → Draft a new release**, choisir le tag `v1.8`,
+   puis joindre `app/build/outputs/apk/release/app-release.apk`.
+
+> Le workflow `Release` fait la même chose depuis l'interface GitHub
+> (**Actions → Release → Run workflow**), mais il a besoin des secrets de
+> signature ci-dessous pour produire un APK installable.
+
+### Secrets de signature (optionnel)
+
+Uniquement si vous voulez publier depuis GitHub Actions. Sans eux, le workflow
+produit un APK **non signé**, qu'Android refuse d'installer par-dessus une
+version déjà installée. À ajouter dans **Settings → Secrets and variables →
+Actions** :
 
 | Secret | Contenu |
 |---|---|
@@ -163,8 +173,9 @@ base64 -i pocketmirror.jks -o keystore.b64   # macOS
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("pocketmirror.jks")) | Set-Content keystore.b64
 ```
 
-> Le workflow de release peut aussi être lancé à la main
-> (**Actions → Release → Run workflow**) en indiquant un tag existant.
+> ⚠️ Le keystore doit être **celui utilisé pour les versions déjà installées**.
+> Un APK signé avec une autre clé ne peut pas mettre à jour l'application : il
+> faut désinstaller, ce qui efface les réglages.
 
 ## Réglages disponibles
 

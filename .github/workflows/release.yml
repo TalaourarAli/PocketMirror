@@ -1,9 +1,10 @@
 name: Release
 
-# Se déclenche uniquement quand un tag de version est poussé (v1.7, v1.8, ...).
+# Publication MANUELLE uniquement : la signature de release est faite en local,
+# avec le keystore de l'auteur, qui ne doit pas être stocké dans le dépôt.
+# Pour l'utiliser quand même : ajouter les secrets KEYSTORE_BASE64,
+# KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD, puis voir le README.
 on:
-  push:
-    tags: [ "v*" ]
   workflow_dispatch:
     inputs:
       tag:
@@ -25,16 +26,14 @@ jobs:
 
       - name: Déterminer le tag
         env:
-          EVENT_NAME: ${{ github.event_name }}
           INPUT_TAG: ${{ inputs.tag }}
         run: |
-          if [ "$EVENT_NAME" = "push" ]; then
-            TAG="$GITHUB_REF_NAME"
-          else
-            TAG="$INPUT_TAG"
+          if [ -z "$INPUT_TAG" ]; then
+            echo "::error::Aucun tag fourni."
+            exit 1
           fi
-          echo "TAG_NAME=$TAG" >> "$GITHUB_ENV"
-          echo "Tag ciblé : $TAG"
+          echo "TAG_NAME=$INPUT_TAG" >> "$GITHUB_ENV"
+          echo "Tag ciblé : $INPUT_TAG"
 
       - name: Vérifier que le tag correspond à versionName
         run: |

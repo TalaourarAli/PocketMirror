@@ -1,0 +1,14 @@
+# Normalise les fins de ligne pour que le dépôt reste utilisable
+# aussi bien sous Windows que sous Linux/macOS.
+
+* text=auto
+
+# Scripts Gradle : LF obligatoire côté Unix, CRLF côté cmd.exe.
+gradlew         text eol=lf
+gradlew.bat     text eol=crlf
+*.sh            text eol=lf
+*.bat           text eol=crlf
+
+*.jar           binary
+*.png           binary
+*.jpg           binary
