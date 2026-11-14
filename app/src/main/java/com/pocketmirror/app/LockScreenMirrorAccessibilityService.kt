@@ -61,6 +61,7 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
     private var buttonParams: WindowManager.LayoutParams? = null
 
     private var mirrorContainerWindow: View? = null
+    private var mirrorWindowParams: WindowManager.LayoutParams? = null
     private var maskedCard: MaskedMirrorContainer? = null
     private var previewView: PreviewView? = null
     private var cameraProvider: ProcessCameraProvider? = null
@@ -402,6 +403,10 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         val card = ensureOverlayWindow() ?: return
         val preview = previewView ?: return
 
+        // Tant que le miroir est ouvert, on empêche l'écran de s'éteindre :
+        // sinon le timeout éteint l'écran et le service ferme le miroir au passage.
+        setMirrorKeepScreenOn(true)
+
         applyMirrorGeometry(card, MirrorPrefs.getGeometry(this))
         card.revealProgress = 0f
         if (cameraBound && preview.previewStreamState.value == PreviewView.StreamState.STREAMING) {
@@ -450,6 +455,7 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
 
             card.revealProgress = 0f
             mirrorContainerWindow = created
+            mirrorWindowParams = params
             maskedCard = card
             previewView = preview
 
@@ -532,6 +538,22 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         }
     }
 
+    /**
+     * Ajoute ou retire FLAG_KEEP_SCREEN_ON sur la fenêtre du miroir.
+     * Le flag est porté par la fenêtre elle-même : pas de wakelock, pas de permission,
+     * et l'écran reste allumé uniquement tant que cette fenêtre est visible.
+     */
+    private fun setMirrorKeepScreenOn(enabled: Boolean) {
+        val view = mirrorContainerWindow ?: return
+        val params = mirrorWindowParams ?: return
+        val flag = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        if ((params.flags and flag != 0) == enabled) return
+
+        params.flags = if (enabled) params.flags or flag else params.flags and flag.inv()
+        runCatching { windowManager.updateViewLayout(view, params) }
+            .onFailure { Log.w(TAG, "keepScreenOn update failed", it) }
+    }
+
     private fun closeMirrorAnimated() {
         if (!isMirrorOpen) return
         isMirrorOpen = false
@@ -556,6 +578,7 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         revealStarted = false
         currentAnimator?.cancel()
         currentAnimator = null
+        setMirrorKeepScreenOn(false)
         val card = maskedCard
         revealFallback?.let { card?.removeCallbacks(it) }
         revealFallback = null
@@ -575,6 +598,7 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
             mirrorContainerWindow?.let { runCatching { windowManager.removeView(it) } }
         }
         mirrorContainerWindow = null
+        mirrorWindowParams = null
         maskedCard = null
         previewView = null
     }
