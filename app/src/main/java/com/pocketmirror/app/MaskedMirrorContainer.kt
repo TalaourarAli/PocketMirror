@@ -2,13 +2,20 @@ package com.pocketmirror.app
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.SweepGradient
 import android.util.AttributeSet
 import android.widget.FrameLayout
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.sin
 
+/**
+ * Conteneur du miroir : découpe la preview caméra selon la forme choisie et
+ * dessine un cadre décoratif autour, pour l'effet « vrai miroir ».
+ */
 class MaskedMirrorContainer @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -18,7 +25,7 @@ class MaskedMirrorContainer @JvmOverloads constructor(
     var shapeMode: MirrorShape = MirrorShape.CIRCLE
         set(value) {
             field = value
-            rebuildShapePath()
+            rebuildPaths()
             invalidate()
         }
 
@@ -29,41 +36,100 @@ class MaskedMirrorContainer @JvmOverloads constructor(
             invalidate()
         }
 
-    private val shapePath = Path()
-    private val rectF = RectF()
-    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val density = context.resources.displayMetrics.density
+    private val frameWidthPx: Float
+        get() = (min(width, height) * FRAME_RATIO).coerceAtLeast(MIN_FRAME_DP * density)
+
+    private val contentPath = Path()
+    private val outerPath = Path()
+    private val framePath = Path()
+    private val shapeRect = RectF()
+
+    private val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    private val outerEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.argb(225, 255, 255, 255)
-        strokeWidth = 3f * resources.displayMetrics.density
+        color = 0x40000000
+        strokeWidth = 1f * density
+    }
+    private val innerHighlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = 0x99FFFFFF.toInt()
+        strokeWidth = 1.6f * density
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        rebuildShapePath()
+        rebuildPaths()
     }
 
-    private fun rebuildShapePath() {
+    private fun rebuildPaths() {
         val w = width.toFloat()
         val h = height.toFloat()
         if (w <= 0f || h <= 0f) return
 
-        val halfStroke = borderPaint.strokeWidth / 2f
-        rectF.set(halfStroke, halfStroke, w - halfStroke, h - halfStroke)
-        shapePath.reset()
+        val frame = frameWidthPx
+        if (frame <= 0f) return
 
-        when (shapeMode) {
-            MirrorShape.ROUNDED_SQ -> {
-                val r = 42f * resources.displayMetrics.density
-                shapePath.addRoundRect(rectF, r, r, Path.Direction.CW)
-            }
-            MirrorShape.PILL -> {
-                val r = rectF.width() / 2f
-                shapePath.addRoundRect(rectF, r, r, Path.Direction.CW)
-            }
-            MirrorShape.CIRCLE -> {
-                shapePath.addOval(rectF, Path.Direction.CW)
-            }
+        contentPath.reset()
+        outerPath.reset()
+        framePath.reset()
+
+        if (shapeMode == MirrorShape.CIRCLE) {
+            val centerX = w / 2f
+            val centerY = h / 2f
+            val outerRadius = min(w, h) / 2f
+            // Les festons mordent sur le bord extérieur, pas sur la découpe caméra.
+            val amplitude = frame * SCALLOP_DEPTH
+            buildScallopedCircle(
+                outerPath,
+                centerX,
+                centerY,
+                outerRadius - amplitude,
+                SCALLOP_LOBES,
+                amplitude
+            )
+            contentPath.addCircle(centerX, centerY, outerRadius - frame, Path.Direction.CW)
+        } else {
+            shapeRect.set(0f, 0f, w, h)
+            addRoundedShape(outerPath, shapeRect, shapeMode)
+            shapeRect.set(frame, frame, w - frame, h - frame)
+            addRoundedShape(contentPath, shapeRect, shapeMode)
         }
+
+        framePath.op(outerPath, contentPath, Path.Op.DIFFERENCE)
+        framePaint.shader = SweepGradient(w / 2f, h / 2f, FRAME_COLORS, FRAME_POSITIONS)
+    }
+
+    private fun addRoundedShape(path: Path, rect: RectF, shape: MirrorShape) {
+        if (shape == MirrorShape.PILL) {
+            val radius = rect.width() / 2f
+            path.addRoundRect(rect, radius, radius, Path.Direction.CW)
+        } else {
+            val radius = 42f * density
+            path.addRoundRect(rect, radius, radius, Path.Direction.CW)
+        }
+    }
+
+    /** Cercle festonné : r(θ) = base + amplitude·cos(lobes·θ). */
+    private fun buildScallopedCircle(
+        path: Path,
+        centerX: Float,
+        centerY: Float,
+        baseRadius: Float,
+        lobes: Int,
+        amplitude: Float,
+    ) {
+        val steps = lobes * SCALLOP_STEPS_PER_LOBE
+        for (i in 0..steps) {
+            val angle = (i.toFloat() / steps) * TWO_PI
+            val radius = baseRadius + amplitude * cos(lobes * angle)
+            val x = centerX + radius * cos(angle)
+            val y = centerY + radius * sin(angle)
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
     }
 
     override fun dispatchDraw(canvas: Canvas) {
@@ -86,11 +152,38 @@ class MaskedMirrorContainer @JvmOverloads constructor(
 
         canvas.scale(revealProgress, revealProgress, pivotX, pivotY)
 
-        // Découpe stricte selon la forme choisie -> zéro rectangle noir !
-        canvas.clipPath(shapePath)
+        // Cadre décoratif, puis preview découpée à la forme intérieure.
+        canvas.drawPath(framePath, framePaint)
+        canvas.drawPath(outerPath, outerEdgePaint)
+
+        canvas.clipPath(contentPath)
         super.dispatchDraw(canvas)
-        canvas.drawPath(shapePath, borderPaint)
 
         canvas.restoreToCount(saveCount)
+
+        // Filet lumineux sur le bord intérieur : effet verre / miroir.
+        canvas.drawPath(contentPath, innerHighlightPaint)
+    }
+
+    private companion object {
+        /** Épaisseur du cadre, en fraction du plus petit côté. */
+        const val FRAME_RATIO = 0.055f
+        const val MIN_FRAME_DP = 6f
+
+        const val SCALLOP_LOBES = 14
+        const val SCALLOP_DEPTH = 0.85f
+        const val SCALLOP_STEPS_PER_LOBE = 20
+
+        val TWO_PI = (2.0 * Math.PI).toFloat()
+
+        val FRAME_COLORS = intArrayOf(
+            0xFF8FD3FF.toInt(),
+            0xFF2F79C4.toInt(),
+            0xFFA9E0FF.toInt(),
+            0xFF1F5C9E.toInt(),
+            0xFF6FB7EC.toInt(),
+            0xFF8FD3FF.toInt(),
+        )
+        val FRAME_POSITIONS = floatArrayOf(0f, 0.22f, 0.4f, 0.62f, 0.82f, 1f)
     }
 }
