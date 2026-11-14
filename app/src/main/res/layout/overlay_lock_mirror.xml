@@ -3,23 +3,17 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Cercle miroir en haut sous la caméra frontale -->
-    <FrameLayout
+    <com.pocketmirror.app.MaskedMirrorContainer
         android:id="@+id/circleMirrorContainer"
-        android:layout_width="310dp"
-        android:layout_height="310dp"
-        android:layout_gravity="top|center_horizontal"
-        android:layout_marginTop="12dp"
-        android:background="@drawable/bg_circle_mirror"
-        android:clipToOutline="true"
-        android:elevation="16dp"
-        android:visibility="invisible">
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:layout_gravity="top|center_horizontal">
 
         <androidx.camera.view.PreviewView
             android:id="@+id/lockPreviewView"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
-    </FrameLayout>
+    </com.pocketmirror.app.MaskedMirrorContainer>
 
 </FrameLayout>

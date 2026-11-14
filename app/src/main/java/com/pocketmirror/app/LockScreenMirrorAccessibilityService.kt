@@ -3,23 +3,22 @@ package com.pocketmirror.app
 import android.accessibilityservice.AccessibilityService
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.graphics.Outline
 import android.graphics.PixelFormat
 import android.os.Build
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
-import android.view.ViewAnimationUtils
-import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
-import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.DecelerateInterpolator
+import android.view.animation.AccelerateInterpolator
 import android.widget.FrameLayout
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
@@ -29,7 +28,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
-import kotlin.math.hypot
 
 class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOwner {
 
@@ -48,10 +46,12 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
     private var buttonParams: WindowManager.LayoutParams? = null
 
     private var mirrorContainerWindow: View? = null
-    private var circleCard: View? = null
+    private var maskedCard: MaskedMirrorContainer? = null
     private var previewView: PreviewView? = null
     private var cameraProvider: ProcessCameraProvider? = null
+    private var currentAnimator: ValueAnimator? = null
     private var isMirrorOpen = false
+    private var waitingFirstFrame = false
 
     private val systemReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -65,10 +65,7 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
                 MirrorPrefs.ACTION_PREFS_CHANGED -> {
                     applyButtonPosition()
                     updateLockButtonVisibility()
-                    if (isMirrorOpen) {
-                        // Recharge la forme si le miroir est ouvert
-                        closeMirrorImmediate()
-                    }
+                    maskedCard?.let { configurePopupLayoutAndShape(it) }
                 }
             }
         }
@@ -79,6 +76,9 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         keyguardManager = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+
+        // Pré-initialise ProcessCameraProvider pour accélérer l'ouverture
+        ProcessCameraProvider.getInstance(this)
 
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON)
@@ -126,6 +126,24 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
             val dm = resources.displayMetrics
             dm.widthPixels to dm.heightPixels
         }
+    }
+
+    /**
+     * Trouve le bord supérieur (ou bas selon besoin) du poinçon caméra frontale.
+     * Collé à la caméra = top du poinçon (ou 0 si pas de cutout détecté).
+     */
+    private fun getCameraCutoutAnchorY(): Int {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val cutout = windowManager.maximumWindowMetrics.windowInsets.displayCutout
+            if (cutout != null && cutout.boundingRects.isNotEmpty()) {
+                val topCutout = cutout.boundingRects.minByOrNull { it.top }
+                if (topCutout != null && topCutout.top < 200) {
+                    // On colle le haut du cercle juste au niveau du poinçon caméra
+                    return topCutout.top
+                }
+            }
+        }
+        return 0
     }
 
     private fun updateLockButtonVisibility() {
@@ -215,145 +233,137 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         windowManager.addView(view, params)
     }
 
-    private fun configureShape(card: View) {
+    private fun configurePopupLayoutAndShape(card: MaskedMirrorContainer) {
         val density = resources.displayMetrics.density
         val shape = MirrorPrefs.getMirrorShape(this)
+        val baseSizePx = (MirrorPrefs.getPopupSizeDp(this) * density).toInt()
+        val offsetXPx = (MirrorPrefs.getPopupOffsetXDp(this) * density).toInt()
+        val offsetYPx = (MirrorPrefs.getPopupOffsetYDp(this) * density).toInt()
+        val cutoutTopPx = getCameraCutoutAnchorY()
+
         val lp = card.layoutParams as FrameLayout.LayoutParams
+        lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
 
         when (shape) {
-            MirrorPrefs.SHAPE_ROUNDED_SQ -> {
-                val size = (310 * density).toInt()
-                lp.width = size
-                lp.height = size
-                card.layoutParams = lp
-                card.setBackgroundResource(R.drawable.bg_rounded_mirror)
-                val radius = 42f * density
-                card.outlineProvider = object : ViewOutlineProvider() {
-                    override fun getOutline(view: View, outline: Outline) {
-                        outline.setRoundRect(0, 0, view.width, view.height, radius)
-                    }
-                }
-            }
             MirrorPrefs.SHAPE_PILL -> {
-                lp.width = (290 * density).toInt()
-                lp.height = (400 * density).toInt()
-                card.layoutParams = lp
-                card.setBackgroundResource(R.drawable.bg_pill_mirror)
-                card.outlineProvider = object : ViewOutlineProvider() {
-                    override fun getOutline(view: View, outline: Outline) {
-                        val r = view.width / 2f
-                        outline.setRoundRect(0, 0, view.width, view.height, r)
-                    }
-                }
+                lp.width = baseSizePx
+                lp.height = (baseSizePx * 1.32f).toInt()
             }
-            else -> { // SHAPE_CIRCLE
-                val size = (310 * density).toInt()
-                lp.width = size
-                lp.height = size
-                card.layoutParams = lp
-                card.setBackgroundResource(R.drawable.bg_circle_mirror)
-                card.outlineProvider = object : ViewOutlineProvider() {
-                    override fun getOutline(view: View, outline: Outline) {
-                        outline.setOval(0, 0, view.width, view.height)
-                    }
-                }
+            else -> {
+                lp.width = baseSizePx
+                lp.height = baseSizePx
             }
         }
-        card.clipToOutline = true
+
+        // Collé au poinçon caméra par défaut + offset choisi par l'utilisateur
+        lp.topMargin = (cutoutTopPx + offsetYPx).coerceAtLeast(0)
+        card.translationX = offsetXPx.toFloat()
+        card.layoutParams = lp
+        card.shapeMode = shape
     }
 
     private fun openMirrorOverlay() {
         if (isMirrorOpen) return
         isMirrorOpen = true
+        currentAnimator?.cancel()
 
-        val root = LayoutInflater.from(this).inflate(R.layout.overlay_lock_mirror, null)
-        val card = root.findViewById<View>(R.id.circleMirrorContainer)
-        val preview = root.findViewById<PreviewView>(R.id.lockPreviewView)
+        val root = mirrorContainerWindow ?: LayoutInflater.from(this)
+            .inflate(R.layout.overlay_lock_mirror, null).also { created ->
+                val params = WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                        WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
+                        WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
+                    PixelFormat.TRANSLUCENT
+                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    params.layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+                mirrorContainerWindow = created
+                maskedCard = created.findViewById(R.id.circleMirrorContainer)
+                previewView = created.findViewById<PreviewView>(R.id.lockPreviewView).apply {
+                    // COMPATIBLE utilise TextureView -> zéro SurfaceView noire rectangulaire !
+                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                    scaleX = 1f
+                }
+                windowManager.addView(created, params)
+            }
 
-        configureShape(card)
+        val card = maskedCard ?: return
+        val preview = previewView ?: return
 
-        // CameraX PreviewView inverse déjà automatiquement la caméra frontale en mode miroir naturel !
-        // On laisse scaleX = 1f pour ne pas ré-inverser l'image.
-        preview.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-        preview.scaleX = 1f
+        configurePopupLayoutAndShape(card)
 
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
-            PixelFormat.TRANSLUCENT
-        )
+        // Reste invisible (progress = 0) tant que la 1ère frame vidéo n'est pas prête -> aucun flash noir !
+        card.revealProgress = 0f
+        waitingFirstFrame = true
 
-        mirrorContainerWindow = root
-        circleCard = card
-        previewView = preview
-        windowManager.addView(root, params)
+        preview.previewStreamState.observe(this) { state ->
+            if (isMirrorOpen && waitingFirstFrame && state == PreviewView.StreamState.STREAMING) {
+                waitingFirstFrame = false
+                animateReveal(card, toOpen = true)
+            }
+        }
 
         startFrontCamera(preview)
+    }
 
-        card.post {
-            if (!isMirrorOpen) return@post
-            card.visibility = View.VISIBLE
-            val cx = card.width / 2
-            val cy = 0
-            val finalRadius = hypot(card.width.toDouble(), card.height.toDouble()).toFloat()
+    private fun animateReveal(card: MaskedMirrorContainer, toOpen: Boolean, onEnd: (() -> Unit)? = null) {
+        currentAnimator?.cancel()
+        val start = card.revealProgress
+        val end = if (toOpen) 1f else 0f
 
-            ViewAnimationUtils.createCircularReveal(card, cx, cy, 0f, finalRadius).apply {
-                duration = 280
-                interpolator = AccelerateDecelerateInterpolator()
-                start()
+        currentAnimator = ValueAnimator.ofFloat(start, end).apply {
+            duration = if (toOpen) 240L else 180L
+            interpolator = if (toOpen) DecelerateInterpolator(1.6f) else AccelerateInterpolator(1.4f)
+            addUpdateListener { anim ->
+                card.revealProgress = anim.animatedValue as Float
             }
+            if (onEnd != null) {
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        onEnd()
+                    }
+                })
+            }
+            start()
         }
     }
 
     private fun closeMirrorAnimated() {
         if (!isMirrorOpen) return
         isMirrorOpen = false
+        waitingFirstFrame = false
 
-        val root = mirrorContainerWindow ?: return
-        val card = circleCard
-        cameraProvider?.unbindAll()
-
-        if (card == null || !card.isAttachedToWindow || card.width == 0) {
-            runCatching { windowManager.removeView(root) }
-            mirrorContainerWindow = null
-            circleCard = null
-            previewView = null
+        val card = maskedCard
+        if (card == null || card.revealProgress <= 0.02f) {
+            closeMirrorImmediate()
             return
         }
 
-        val cx = card.width / 2
-        val cy = 0
-        val startRadius = hypot(card.width.toDouble(), card.height.toDouble()).toFloat()
-
-        ViewAnimationUtils.createCircularReveal(card, cx, cy, startRadius, 0f).apply {
-            duration = 200
-            interpolator = AccelerateDecelerateInterpolator()
-            addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    runCatching { windowManager.removeView(root) }
-                    if (mirrorContainerWindow === root) {
-                        mirrorContainerWindow = null
-                        circleCard = null
-                        previewView = null
-                    }
-                }
-            })
-            start()
+        animateReveal(card, toOpen = false) {
+            if (!isMirrorOpen) {
+                closeMirrorImmediate()
+            }
         }
     }
 
     private fun closeMirrorImmediate() {
         isMirrorOpen = false
+        waitingFirstFrame = false
+        currentAnimator?.cancel()
+        currentAnimator = null
         cameraProvider?.unbindAll()
+        previewView?.previewStreamState?.removeObservers(this)
         mirrorContainerWindow?.let { runCatching { windowManager.removeView(it) } }
         mirrorContainerWindow = null
-        circleCard = null
+        maskedCard = null
         previewView = null
     }
 

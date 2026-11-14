@@ -53,7 +53,7 @@
             android:id="@+id/tvStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="18dp"
             android:background="#1B1D29"
             android:padding="14dp"
             android:textColor="#E8EAF6"
@@ -86,7 +86,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="22dp"
             android:text="Mode d'ouverture du miroir"
             android:textColor="#FFFFFF"
             android:textSize="16sp"
@@ -137,7 +137,7 @@
                 android:id="@+id/rbShapeCircle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Cercle (classique sous la caméra)"
+                android:text="Cercle (collé sous la caméra)"
                 android:textColor="#E8EAF6" />
 
             <RadioButton
@@ -155,12 +155,95 @@
                 android:textColor="#E8EAF6" />
         </RadioGroup>
 
-        <!-- Option 3 : Emplacement du bouton -->
+        <!-- Option 3 : Ajuster la position & taille de la popup caméra -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Position &amp; taille de la popup"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnResetPopupPos"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Réinitialiser" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#1B1D29"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <TextView
+                android:id="@+id/tvPopupOffsetY"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Hauteur (collé à la caméra : 0 dp)"
+                android:textColor="#D0D4E8"
+                android:textSize="13sp" />
+
+            <SeekBar
+                android:id="@+id/sbPopupOffsetY"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:max="240"
+                android:progress="40" />
+
+            <TextView
+                android:id="@+id/tvPopupOffsetX"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Décalage Gauche / Droite : 0 dp"
+                android:textColor="#D0D4E8"
+                android:textSize="13sp" />
+
+            <SeekBar
+                android:id="@+id/sbPopupOffsetX"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:max="240"
+                android:progress="120" />
+
+            <TextView
+                android:id="@+id/tvPopupSize"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Taille de la popup : 300 dp"
+                android:textColor="#D0D4E8"
+                android:textSize="13sp" />
+
+            <SeekBar
+                android:id="@+id/sbPopupSize"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:max="200"
+                android:progress="120" />
+        </LinearLayout>
+
+        <!-- Option 4 : Emplacement du bouton -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="Position sur l'écran de verrouillage"
+            android:text="Bouton sur l'écran de verrouillage"
             android:textColor="#FFFFFF"
             android:textSize="16sp"
             android:textStyle="bold" />
@@ -179,7 +262,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Afficher aussi déverrouillé (pour tester)"
+            android:text="Afficher aussi déverrouillé (pour tester en direct)"
             android:textColor="#D0D4E8" />
 
     </LinearLayout>

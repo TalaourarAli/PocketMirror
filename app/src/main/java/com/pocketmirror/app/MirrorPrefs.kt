@@ -10,14 +10,17 @@ object MirrorPrefs {
     private const val KEY_SHAPE = "mirror_shape"
     private const val KEY_BTN_X_RATIO = "button_x_ratio"
     private const val KEY_BTN_Y_RATIO = "button_y_ratio"
+    private const val KEY_POPUP_OFFSET_X_DP = "popup_offset_x_dp"
+    private const val KEY_POPUP_OFFSET_Y_DP = "popup_offset_y_dp"
+    private const val KEY_POPUP_SIZE_DP = "popup_size_dp"
     private const val KEY_TEST_ALWAYS = "test_show_always"
 
-    const val MODE_HOLD = "HOLD"       // Appuyer pour afficher, relâcher pour fermer
-    const val MODE_TOGGLE = "TOGGLE"   // 1 clic ouvre, 1 clic ferme
+    const val MODE_HOLD = "HOLD"
+    const val MODE_TOGGLE = "TOGGLE"
 
-    const val SHAPE_CIRCLE = "CIRCLE"         // Cercle
-    const val SHAPE_ROUNDED_SQ = "ROUNDED_SQ" // Carré arrondi
-    const val SHAPE_PILL = "PILL"             // Ovale / Portrait
+    const val SHAPE_CIRCLE = "CIRCLE"
+    const val SHAPE_ROUNDED_SQ = "ROUNDED_SQ"
+    const val SHAPE_PILL = "PILL"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -36,7 +39,6 @@ object MirrorPrefs {
         prefs(context).edit().putString(KEY_SHAPE, shape).apply()
     }
 
-    // Ratios entre 0.0 et 1.0 par rapport à la largeur/hauteur de l'écran (par défaut bas-centre)
     fun getButtonXRatio(context: Context): Float =
         prefs(context).getFloat(KEY_BTN_X_RATIO, 0.5f)
 
@@ -48,6 +50,28 @@ object MirrorPrefs {
             .putFloat(KEY_BTN_X_RATIO, xRatio.coerceIn(0.06f, 0.94f))
             .putFloat(KEY_BTN_Y_RATIO, yRatio.coerceIn(0.08f, 0.95f))
             .apply()
+    }
+
+    // Décalage de la popup par rapport au poinçon caméra (0 dp = collé pile sous la caméra)
+    fun getPopupOffsetXDp(context: Context): Int =
+        prefs(context).getInt(KEY_POPUP_OFFSET_X_DP, 0)
+
+    fun setPopupOffsetXDp(context: Context, dp: Int) {
+        prefs(context).edit().putInt(KEY_POPUP_OFFSET_X_DP, dp.coerceIn(-120, 120)).apply()
+    }
+
+    fun getPopupOffsetYDp(context: Context): Int =
+        prefs(context).getInt(KEY_POPUP_OFFSET_Y_DP, 0)
+
+    fun setPopupOffsetYDp(context: Context, dp: Int) {
+        prefs(context).edit().putInt(KEY_POPUP_OFFSET_Y_DP, dp.coerceIn(-40, 200)).apply()
+    }
+
+    fun getPopupSizeDp(context: Context): Int =
+        prefs(context).getInt(KEY_POPUP_SIZE_DP, 300)
+
+    fun setPopupSizeDp(context: Context, dp: Int) {
+        prefs(context).edit().putInt(KEY_POPUP_SIZE_DP, dp.coerceIn(180, 380)).apply()
     }
 
     fun getTestShowAlways(context: Context): Boolean =

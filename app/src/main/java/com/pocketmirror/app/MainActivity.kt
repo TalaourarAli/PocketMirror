@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
 import android.widget.RadioGroup
+import android.widget.SeekBar
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -20,6 +21,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnAccessibility: Button
     private lateinit var rgInteractionMode: RadioGroup
     private lateinit var rgMirrorShape: RadioGroup
+    private lateinit var tvPopupOffsetY: TextView
+    private lateinit var sbPopupOffsetY: SeekBar
+    private lateinit var tvPopupOffsetX: TextView
+    private lateinit var sbPopupOffsetX: SeekBar
+    private lateinit var tvPopupSize: TextView
+    private lateinit var sbPopupSize: SeekBar
+    private lateinit var btnResetPopupPos: Button
     private lateinit var btnConfigurePosition: Button
     private lateinit var switchTestAlways: SwitchMaterial
 
@@ -38,6 +46,13 @@ class MainActivity : AppCompatActivity() {
         btnAccessibility = findViewById(R.id.btnAccessibility)
         rgInteractionMode = findViewById(R.id.rgInteractionMode)
         rgMirrorShape = findViewById(R.id.rgMirrorShape)
+        tvPopupOffsetY = findViewById(R.id.tvPopupOffsetY)
+        sbPopupOffsetY = findViewById(R.id.sbPopupOffsetY)
+        tvPopupOffsetX = findViewById(R.id.tvPopupOffsetX)
+        sbPopupOffsetX = findViewById(R.id.sbPopupOffsetX)
+        tvPopupSize = findViewById(R.id.tvPopupSize)
+        sbPopupSize = findViewById(R.id.sbPopupSize)
+        btnResetPopupPos = findViewById(R.id.btnResetPopupPos)
         btnConfigurePosition = findViewById(R.id.btnConfigurePosition)
         switchTestAlways = findViewById(R.id.switchTestAlways)
 
@@ -49,7 +64,6 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
 
-        // Initialiser le mode d'ouverture
         when (MirrorPrefs.getInteractionMode(this)) {
             MirrorPrefs.MODE_TOGGLE -> rgInteractionMode.check(R.id.rbModeToggle)
             else -> rgInteractionMode.check(R.id.rbModeHold)
@@ -64,7 +78,6 @@ class MainActivity : AppCompatActivity() {
             notifyServicePrefsChanged()
         }
 
-        // Initialiser la forme
         when (MirrorPrefs.getMirrorShape(this)) {
             MirrorPrefs.SHAPE_ROUNDED_SQ -> rgMirrorShape.check(R.id.rbShapeRoundedSq)
             MirrorPrefs.SHAPE_PILL -> rgMirrorShape.check(R.id.rbShapePill)
@@ -80,7 +93,8 @@ class MainActivity : AppCompatActivity() {
             notifyServicePrefsChanged()
         }
 
-        // Page dédiée à l'emplacement du bouton
+        setupPopupSliders()
+
         btnConfigurePosition.setOnClickListener {
             startActivity(Intent(this, ButtonPositionActivity::class.java))
         }
@@ -90,6 +104,89 @@ class MainActivity : AppCompatActivity() {
             MirrorPrefs.setTestShowAlways(this, isChecked)
             notifyServicePrefsChanged()
         }
+    }
+
+    private fun setupPopupSliders() {
+        // Offset Y : plage -40..+200 dp (progress 0..240)
+        val initY = MirrorPrefs.getPopupOffsetYDp(this)
+        sbPopupOffsetY.progress = (initY + 40).coerceIn(0, 240)
+        updateOffsetYLabel(initY)
+
+        sbPopupOffsetY.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val dp = progress - 40
+                updateOffsetYLabel(dp)
+                if (fromUser) {
+                    MirrorPrefs.setPopupOffsetYDp(this@MainActivity, dp)
+                    notifyServicePrefsChanged()
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        // Offset X : plage -120..+120 dp (progress 0..240)
+        val initX = MirrorPrefs.getPopupOffsetXDp(this)
+        sbPopupOffsetX.progress = (initX + 120).coerceIn(0, 240)
+        updateOffsetXLabel(initX)
+
+        sbPopupOffsetX.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val dp = progress - 120
+                updateOffsetXLabel(dp)
+                if (fromUser) {
+                    MirrorPrefs.setPopupOffsetXDp(this@MainActivity, dp)
+                    notifyServicePrefsChanged()
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        // Taille : plage 180..380 dp (progress 0..200)
+        val initSize = MirrorPrefs.getPopupSizeDp(this)
+        sbPopupSize.progress = (initSize - 180).coerceIn(0, 200)
+        updateSizeLabel(initSize)
+
+        sbPopupSize.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val dp = progress + 180
+                updateSizeLabel(dp)
+                if (fromUser) {
+                    MirrorPrefs.setPopupSizeDp(this@MainActivity, dp)
+                    notifyServicePrefsChanged()
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        btnResetPopupPos.setOnClickListener {
+            MirrorPrefs.setPopupOffsetXDp(this, 0)
+            MirrorPrefs.setPopupOffsetYDp(this, 0)
+            MirrorPrefs.setPopupSizeDp(this, 300)
+            sbPopupOffsetY.progress = 40
+            sbPopupOffsetX.progress = 120
+            sbPopupSize.progress = 120
+            updateOffsetYLabel(0)
+            updateOffsetXLabel(0)
+            updateSizeLabel(300)
+            notifyServicePrefsChanged()
+        }
+    }
+
+    private fun updateOffsetYLabel(dp: Int) {
+        val sign = if (dp > 0) "+$dp" else "$dp"
+        tvPopupOffsetY.text = "Hauteur (0 = collé à la caméra) : $sign dp"
+    }
+
+    private fun updateOffsetXLabel(dp: Int) {
+        val sign = if (dp > 0) "+$dp" else "$dp"
+        tvPopupOffsetX.text = "Décalage Gauche / Droite : $sign dp"
+    }
+
+    private fun updateSizeLabel(dp: Int) {
+        tvPopupSize.text = "Taille de la popup : $dp dp"
     }
 
     override fun onResume() {
