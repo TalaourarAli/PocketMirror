@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">PocketMirror</string>
+    <string name="accessibility_desc">Affiche le bouton miroir sur l\'écran de verrouillage et ouvre la caméra frontale en mode miroir.</string>
 </resources>

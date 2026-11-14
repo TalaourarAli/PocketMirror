@@ -4,41 +4,34 @@
     <uses-feature android:name="android.hardware.camera.front" android:required="true" />
 
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
-        android:icon="@android:drawable/ic_menu_camera"
+        android:icon="@drawable/ic_mirror"
         android:label="PocketMirror"
         android:supportsRtl="true"
         android:theme="@style/Theme.Material3.Dark.NoActionBar">
 
         <activity
             android:name=".MainActivity"
-            android:exported="true"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".MirrorLockActivity"
-            android:exported="true"
-            android:label="Miroir rapide"
-            android:launchMode="singleTop"
-            android:showWhenLocked="true"
-            android:theme="@style/Theme.PocketMirror.Overlay"
-            android:turnScreenOn="true" />
-
         <service
-            android:name=".MirrorOverlayService"
-            android:exported="false"
-            android:foregroundServiceType="camera" />
+            android:name=".LockScreenMirrorAccessibilityService"
+            android:exported="true"
+            android:label="PocketMirror (Écran verrouillé)"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
     </application>
 </manifest>

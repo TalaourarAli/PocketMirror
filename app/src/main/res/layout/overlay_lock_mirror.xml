@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Cercle miroir en haut sous la caméra frontale -->
+    <FrameLayout
+        android:id="@+id/circleMirrorContainer"
+        android:layout_width="310dp"
+        android:layout_height="310dp"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_circle_mirror"
+        android:clipToOutline="true"
+        android:elevation="16dp"
+        android:visibility="invisible">
+
+        <androidx.camera.view.PreviewView
+            android:id="@+id/lockPreviewView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </FrameLayout>
+
+</FrameLayout>
