@@ -22,6 +22,7 @@
                 android:layout_width="52dp"
                 android:layout_height="52dp"
                 android:background="@drawable/bg_lock_shortcut"
+                android:importantForAccessibility="no"
                 android:padding="12dp"
                 android:src="@drawable/ic_mirror" />
 
@@ -34,7 +35,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Instant Mirror"
+                    android:text="@string/header_title"
                     android:textColor="#FFFFFF"
                     android:textSize="22sp"
                     android:textStyle="bold" />
@@ -42,7 +43,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Miroir rapide sur écran verrouillé"
+                    android:text="@string/header_subtitle"
                     android:textColor="#9AA0B8"
                     android:textSize="13sp" />
             </LinearLayout>
@@ -71,7 +72,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
-                android:text="Caméra" />
+                android:text="@string/btn_camera_permission" />
 
             <Button
                 android:id="@+id/btnAccessibility"
@@ -79,7 +80,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
-                android:text="Service Lockscreen" />
+                android:text="@string/btn_accessibility_service" />
         </LinearLayout>
 
         <!-- Option 1 : Comportement du bouton -->
@@ -87,7 +88,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="22dp"
-            android:text="Mode d'ouverture du miroir"
+            android:text="@string/section_mode"
             android:textColor="#FFFFFF"
             android:textSize="16sp"
             android:textStyle="bold" />
@@ -104,14 +105,14 @@
                 android:id="@+id/rbModeHold"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Maintenir appuyé (relâcher pour fermer)"
+                android:text="@string/mode_hold"
                 android:textColor="#E8EAF6" />
 
             <RadioButton
                 android:id="@+id/rbModeToggle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Interrupteur (1 appui ouvre / 1 appui ferme)"
+                android:text="@string/mode_toggle"
                 android:textColor="#E8EAF6" />
         </RadioGroup>
 
@@ -120,7 +121,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="Forme de la popup caméra"
+            android:text="@string/section_shape"
             android:textColor="#FFFFFF"
             android:textSize="16sp"
             android:textStyle="bold" />
@@ -137,21 +138,21 @@
                 android:id="@+id/rbShapeCircle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Cercle (collé sous la caméra)"
+                android:text="@string/shape_circle"
                 android:textColor="#E8EAF6" />
 
             <RadioButton
                 android:id="@+id/rbShapeRoundedSq"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Carré aux coins arrondis"
+                android:text="@string/shape_rounded_sq"
                 android:textColor="#E8EAF6" />
 
             <RadioButton
                 android:id="@+id/rbShapePill"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Ovale vertical (Portrait grand format)"
+                android:text="@string/shape_pill"
                 android:textColor="#E8EAF6" />
         </RadioGroup>
 
@@ -167,7 +168,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Position &amp; taille de la popup"
+                android:text="@string/section_popup"
                 android:textColor="#FFFFFF"
                 android:textSize="16sp"
                 android:textStyle="bold" />
@@ -177,7 +178,7 @@
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Réinitialiser" />
+                android:text="@string/action_reset" />
         </LinearLayout>
 
         <LinearLayout
@@ -191,7 +192,7 @@
                 android:id="@+id/tvPopupOffsetY"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Hauteur (collé à la caméra : 0 dp)"
+                android:text="@string/popup_offset_y_label"
                 android:textColor="#D0D4E8"
                 android:textSize="13sp" />
 
@@ -208,7 +209,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="Décalage Gauche / Droite : 0 dp"
+                android:text="@string/popup_offset_x_label"
                 android:textColor="#D0D4E8"
                 android:textSize="13sp" />
 
@@ -225,7 +226,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="Taille de la popup : 300 dp"
+                android:text="@string/popup_size_label"
                 android:textColor="#D0D4E8"
                 android:textSize="13sp" />
 
@@ -243,7 +244,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="Bouton sur l'écran de verrouillage"
+            android:text="@string/section_button"
             android:textColor="#FFFFFF"
             android:textSize="16sp"
             android:textStyle="bold" />
@@ -254,7 +255,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Configurer l'emplacement du bouton" />
+            android:text="@string/action_configure_position" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -268,7 +269,7 @@
                 android:id="@+id/tvButtonSize"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Taille du bouton : 54 dp"
+                android:text="@string/button_size_label"
                 android:textColor="#D0D4E8"
                 android:textSize="13sp" />
 
@@ -285,7 +286,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="Transparence du bouton : 100 %"
+                android:text="@string/button_alpha_label"
                 android:textColor="#D0D4E8"
                 android:textSize="13sp" />
 
@@ -304,7 +305,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Afficher aussi déverrouillé (pour tester en direct)"
+            android:text="@string/switch_test_always"
             android:textColor="#D0D4E8" />
 
     </LinearLayout>

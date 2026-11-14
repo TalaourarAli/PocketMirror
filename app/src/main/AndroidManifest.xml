@@ -2,13 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-feature android:name="android.hardware.camera.front" android:required="true" />
+    <!-- Déclaré pour ChromeOS : la caméra frontale reste obligatoire ci-dessus. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:allowBackup="true"
         android:icon="@drawable/ic_mirror"
-        android:label="PocketMirror"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.Material3.Dark.NoActionBar">
 
@@ -29,7 +31,7 @@
         <service
             android:name=".LockScreenMirrorAccessibilityService"
             android:exported="true"
-            android:label="PocketMirror (Écran verrouillé)"
+            android:label="@string/accessibility_service_label"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />

@@ -1,4 +1,40 @@
 <resources>
     <string name="app_name">PocketMirror</string>
+    <string name="accessibility_service_label">PocketMirror (Écran verrouillé)</string>
     <string name="accessibility_desc">Affiche le bouton miroir sur l\'écran de verrouillage et ouvre la caméra frontale en mode miroir.</string>
+
+    <string name="header_title">Instant Mirror</string>
+    <string name="header_subtitle">Miroir rapide sur écran verrouillé</string>
+
+    <string name="btn_camera_permission">Caméra</string>
+    <string name="btn_accessibility_service">Service Lockscreen</string>
+
+    <string name="section_mode">Mode d\'ouverture du miroir</string>
+    <string name="mode_hold">Maintenir appuyé (relâcher pour fermer)</string>
+    <string name="mode_toggle">Interrupteur (1 appui ouvre / 1 appui ferme)</string>
+
+    <string name="section_shape">Forme de la popup caméra</string>
+    <string name="shape_circle">Cercle (collé sous la caméra)</string>
+    <string name="shape_rounded_sq">Carré aux coins arrondis</string>
+    <string name="shape_pill">Ovale vertical (Portrait grand format)</string>
+
+    <string name="section_popup">Position &amp; taille de la popup</string>
+    <string name="action_reset">Réinitialiser</string>
+    <string name="popup_offset_y_label">Hauteur (collé à la caméra : 0 dp)</string>
+    <string name="popup_offset_x_label">Décalage Gauche / Droite : 0 dp</string>
+    <string name="popup_size_label">Taille de la popup : 300 dp</string>
+
+    <string name="section_button">Bouton sur l\'écran de verrouillage</string>
+    <string name="action_configure_position">Configurer l\'emplacement du bouton</string>
+    <string name="button_size_label">Taille du bouton : 54 dp</string>
+    <string name="button_alpha_label">Transparence du bouton : 100 %</string>
+
+    <string name="switch_test_always">Afficher aussi déverrouillé (pour tester en direct)</string>
+
+    <string name="cd_mirror">Miroir</string>
+
+    <string name="preview_clock">12:47</string>
+    <string name="preview_hint">Glissez le bouton miroir où vous voulez</string>
+    <string name="action_save">Enregistrer</string>
+    <string name="toast_position_saved">Emplacement enregistré</string>
 </resources>

@@ -15,7 +15,7 @@ class MaskedMirrorContainer @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : FrameLayout(context, attrs, defStyleAttr) {
 
-    var shapeMode: String = MirrorPrefs.SHAPE_CIRCLE
+    var shapeMode: MirrorShape = MirrorShape.CIRCLE
         set(value) {
             field = value
             rebuildShapePath()
@@ -52,15 +52,15 @@ class MaskedMirrorContainer @JvmOverloads constructor(
         shapePath.reset()
 
         when (shapeMode) {
-            MirrorPrefs.SHAPE_ROUNDED_SQ -> {
+            MirrorShape.ROUNDED_SQ -> {
                 val r = 42f * resources.displayMetrics.density
                 shapePath.addRoundRect(rectF, r, r, Path.Direction.CW)
             }
-            MirrorPrefs.SHAPE_PILL -> {
+            MirrorShape.PILL -> {
                 val r = rectF.width() / 2f
                 shapePath.addRoundRect(rectF, r, r, Path.Direction.CW)
             }
-            else -> {
+            MirrorShape.CIRCLE -> {
                 shapePath.addOval(rectF, Path.Direction.CW)
             }
         }

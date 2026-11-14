@@ -7,9 +7,10 @@
     android:elevation="6dp">
 
     <ImageView
+        android:id="@+id/lockButtonIcon"
         android:layout_width="24dp"
         android:layout_height="24dp"
         android:layout_gravity="center"
-        android:contentDescription="Miroir"
+        android:contentDescription="@string/cd_mirror"
         android:src="@drawable/ic_mirror" />
 </FrameLayout>

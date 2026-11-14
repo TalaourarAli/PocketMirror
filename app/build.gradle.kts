@@ -13,6 +13,9 @@ val keystoreProps = Properties().apply {
         FileInputStream(keystorePropsFile).use { load(it) }
     }
 }
+if (!keystorePropsFile.exists()) {
+    logger.warn("keystore.properties absent : le build release sera produit NON SIGNÉ.")
+}
 
 android {
     namespace = "com.pocketmirror.app"
@@ -22,8 +25,14 @@ android {
         applicationId = "com.pocketmirror.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.3"
+        versionCode = 4
+        versionName = "1.4"
+    }
+
+    buildFeatures {
+        // Nécessaire pour BuildConfig.DEBUG : le receiver de debug n'est enregistré
+        // qu'en debug, jamais en release.
+        buildConfig = true
     }
 
     signingConfigs {

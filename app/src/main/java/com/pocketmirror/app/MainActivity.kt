@@ -72,42 +72,14 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
 
-        when (MirrorPrefs.getInteractionMode(this)) {
-            MirrorPrefs.MODE_TOGGLE -> rgInteractionMode.check(R.id.rbModeToggle)
-            else -> rgInteractionMode.check(R.id.rbModeHold)
-        }
-        rgInteractionMode.setOnCheckedChangeListener { _, checkedId ->
-            val mode = if (checkedId == R.id.rbModeToggle) {
-                MirrorPrefs.MODE_TOGGLE
-            } else {
-                MirrorPrefs.MODE_HOLD
-            }
-            MirrorPrefs.setInteractionMode(this, mode)
-            notifyServicePrefsChanged()
-        }
-
-        when (MirrorPrefs.getMirrorShape(this)) {
-            MirrorPrefs.SHAPE_ROUNDED_SQ -> rgMirrorShape.check(R.id.rbShapeRoundedSq)
-            MirrorPrefs.SHAPE_PILL -> rgMirrorShape.check(R.id.rbShapePill)
-            else -> rgMirrorShape.check(R.id.rbShapeCircle)
-        }
-        rgMirrorShape.setOnCheckedChangeListener { _, checkedId ->
-            val shape = when (checkedId) {
-                R.id.rbShapeRoundedSq -> MirrorPrefs.SHAPE_ROUNDED_SQ
-                R.id.rbShapePill -> MirrorPrefs.SHAPE_PILL
-                else -> MirrorPrefs.SHAPE_CIRCLE
-            }
-            MirrorPrefs.setMirrorShape(this, shape)
-            notifyServicePrefsChanged()
-        }
-
+        bindModeSelector()
+        bindShapeSelector()
         setupPopupSliders()
+        setupButtonAppearanceSliders()
 
         btnConfigurePosition.setOnClickListener {
             startActivity(Intent(this, ButtonPositionActivity::class.java))
         }
-
-        setupButtonAppearanceSliders()
 
         switchTestAlways.isChecked = MirrorPrefs.getTestShowAlways(this)
         switchTestAlways.setOnCheckedChangeListener { _, isChecked ->
@@ -116,42 +88,93 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun bindModeSelector() {
+        val mode = MirrorPrefs.getInteractionMode(this)
+        rgInteractionMode.check(
+            if (mode == InteractionMode.TOGGLE) R.id.rbModeToggle else R.id.rbModeHold
+        )
+        rgInteractionMode.setOnCheckedChangeListener { _, checkedId ->
+            MirrorPrefs.setInteractionMode(this, modeForRadio(checkedId))
+            notifyServicePrefsChanged()
+        }
+    }
+
+    private fun bindShapeSelector() {
+        rgMirrorShape.check(radioForShape(MirrorPrefs.getMirrorShape(this)))
+        rgMirrorShape.setOnCheckedChangeListener { _, checkedId ->
+            MirrorPrefs.setMirrorShape(this, shapeForRadio(checkedId))
+            notifyServicePrefsChanged()
+        }
+    }
+
+    private fun modeForRadio(checkedId: Int): InteractionMode =
+        if (checkedId == R.id.rbModeToggle) InteractionMode.TOGGLE else InteractionMode.HOLD
+
+    private fun shapeForRadio(checkedId: Int): MirrorShape = when (checkedId) {
+        R.id.rbShapeRoundedSq -> MirrorShape.ROUNDED_SQ
+        R.id.rbShapePill -> MirrorShape.PILL
+        else -> MirrorShape.CIRCLE
+    }
+
+    private fun radioForShape(shape: MirrorShape): Int = when (shape) {
+        MirrorShape.ROUNDED_SQ -> R.id.rbShapeRoundedSq
+        MirrorShape.PILL -> R.id.rbShapePill
+        MirrorShape.CIRCLE -> R.id.rbShapeCircle
+    }
+
+    /**
+     * Câble un SeekBar à une préférence entière : `render` met à jour le libellé,
+     * `store` persiste la valeur (uniquement quand c'est l'utilisateur qui bouge).
+     * Les quatre sliders faisaient ce travail à la main avec le même code copié.
+     */
+    private fun bindSlider(
+        seekBar: SeekBar,
+        initialValue: Int,
+        min: Int,
+        max: Int,
+        render: (Int) -> Unit,
+        store: (Int) -> Unit,
+    ) {
+        seekBar.max = max - min
+        seekBar.progress = (initialValue - min).coerceIn(0, seekBar.max)
+        render(initialValue)
+
+        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val value = progress + min
+                render(value)
+                if (fromUser) store(value)
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+            override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+        })
+    }
+
     private fun setupButtonAppearanceSliders() {
-        // Taille : 36..84 dp (progress 0..48)
-        val initSize = MirrorPrefs.getButtonSizeDp(this)
-        sbButtonSize.progress = (initSize - 36).coerceIn(0, 48)
-        updateButtonSizeLabel(initSize)
+        bindSlider(
+            seekBar = sbButtonSize,
+            initialValue = MirrorPrefs.getButtonSizeDp(this),
+            min = BUTTON_SIZE_MIN_DP,
+            max = BUTTON_SIZE_MAX_DP,
+            render = ::updateButtonSizeLabel,
+            store = {
+                MirrorPrefs.setButtonSizeDp(this, it)
+                notifyServicePrefsChanged()
+            },
+        )
 
-        sbButtonSize.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val dp = progress + 36
-                updateButtonSizeLabel(dp)
-                if (fromUser) {
-                    MirrorPrefs.setButtonSizeDp(this@MainActivity, dp)
-                    notifyServicePrefsChanged()
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
-
-        // Transparence : 20..100 % (progress 0..80 => alpha 0.2..1.0)
-        val initAlpha = MirrorPrefs.getButtonAlpha(this)
-        sbButtonAlpha.progress = ((initAlpha * 100f).toInt() - 20).coerceIn(0, 80)
-        updateButtonAlphaLabel(initAlpha)
-
-        sbButtonAlpha.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val alpha = (progress + 20) / 100f
-                updateButtonAlphaLabel(alpha)
-                if (fromUser) {
-                    MirrorPrefs.setButtonAlpha(this@MainActivity, alpha)
-                    notifyServicePrefsChanged()
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+        bindSlider(
+            seekBar = sbButtonAlpha,
+            initialValue = (MirrorPrefs.getButtonAlpha(this) * 100f).toInt(),
+            min = BUTTON_ALPHA_MIN_PERCENT,
+            max = 100,
+            render = { updateButtonAlphaLabel(it / 100f) },
+            store = {
+                MirrorPrefs.setButtonAlpha(this, it / 100f)
+                notifyServicePrefsChanged()
+            },
+        )
     }
 
     private fun updateButtonSizeLabel(dp: Int) {
@@ -170,70 +193,49 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupPopupSliders() {
-        // Offset Y : plage -40..+200 dp (progress 0..240)
-        val initY = MirrorPrefs.getPopupOffsetYDp(this)
-        sbPopupOffsetY.progress = (initY + 40).coerceIn(0, 240)
-        updateOffsetYLabel(initY)
+        bindSlider(
+            seekBar = sbPopupOffsetY,
+            initialValue = MirrorPrefs.getPopupOffsetYDp(this),
+            min = POPUP_OFFSET_Y_MIN_DP,
+            max = POPUP_OFFSET_Y_MAX_DP,
+            render = ::updateOffsetYLabel,
+            store = {
+                MirrorPrefs.setPopupOffsetYDp(this, it)
+                notifyServicePrefsChanged()
+            },
+        )
 
-        sbPopupOffsetY.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val dp = progress - 40
-                updateOffsetYLabel(dp)
-                if (fromUser) {
-                    MirrorPrefs.setPopupOffsetYDp(this@MainActivity, dp)
-                    notifyServicePrefsChanged()
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+        bindSlider(
+            seekBar = sbPopupOffsetX,
+            initialValue = MirrorPrefs.getPopupOffsetXDp(this),
+            min = POPUP_OFFSET_X_MIN_DP,
+            max = POPUP_OFFSET_X_MAX_DP,
+            render = ::updateOffsetXLabel,
+            store = {
+                MirrorPrefs.setPopupOffsetXDp(this, it)
+                notifyServicePrefsChanged()
+            },
+        )
 
-        // Offset X : plage -120..+120 dp (progress 0..240)
-        val initX = MirrorPrefs.getPopupOffsetXDp(this)
-        sbPopupOffsetX.progress = (initX + 120).coerceIn(0, 240)
-        updateOffsetXLabel(initX)
-
-        sbPopupOffsetX.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val dp = progress - 120
-                updateOffsetXLabel(dp)
-                if (fromUser) {
-                    MirrorPrefs.setPopupOffsetXDp(this@MainActivity, dp)
-                    notifyServicePrefsChanged()
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
-
-        // Taille : plage 180..380 dp (progress 0..200)
-        val initSize = MirrorPrefs.getPopupSizeDp(this)
-        sbPopupSize.progress = (initSize - 180).coerceIn(0, 200)
-        updateSizeLabel(initSize)
-
-        sbPopupSize.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val dp = progress + 180
-                updateSizeLabel(dp)
-                if (fromUser) {
-                    MirrorPrefs.setPopupSizeDp(this@MainActivity, dp)
-                    notifyServicePrefsChanged()
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+        bindSlider(
+            seekBar = sbPopupSize,
+            initialValue = MirrorPrefs.getPopupSizeDp(this),
+            min = POPUP_SIZE_MIN_DP,
+            max = POPUP_SIZE_MAX_DP,
+            render = ::updateSizeLabel,
+            store = {
+                MirrorPrefs.setPopupSizeDp(this, it)
+                notifyServicePrefsChanged()
+            },
+        )
 
         btnResetPopupPos.setOnClickListener {
             MirrorPrefs.setPopupOffsetXDp(this, 0)
             MirrorPrefs.setPopupOffsetYDp(this, 0)
-            MirrorPrefs.setPopupSizeDp(this, 300)
-            sbPopupOffsetY.progress = 40
-            sbPopupOffsetX.progress = 120
-            sbPopupSize.progress = 120
-            updateOffsetYLabel(0)
-            updateOffsetXLabel(0)
-            updateSizeLabel(300)
+            MirrorPrefs.setPopupSizeDp(this, POPUP_SIZE_DEFAULT_DP)
+            sbPopupOffsetY.progress = -POPUP_OFFSET_Y_MIN_DP
+            sbPopupOffsetX.progress = -POPUP_OFFSET_X_MIN_DP
+            sbPopupSize.progress = POPUP_SIZE_DEFAULT_DP - POPUP_SIZE_MIN_DP
             notifyServicePrefsChanged()
         }
     }
@@ -257,16 +259,14 @@ class MainActivity : AppCompatActivity() {
         updateUi()
     }
 
-    private fun notifyServicePrefsChanged() {
-        sendBroadcast(Intent(MirrorPrefs.ACTION_PREFS_CHANGED).setPackage(packageName))
-    }
+    private fun notifyServicePrefsChanged() = MirrorPrefs.notifyChanged(this)
 
     private fun hasCameraPermission(): Boolean =
         ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
 
     private fun isAccessibilityEnabled(): Boolean {
-        if (LockScreenMirrorAccessibilityService.isConnectedService) return true
+        if (LockScreenMirrorAccessibilityService.isRunning) return true
         val enabled = Settings.Secure.getString(
             contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
@@ -287,5 +287,18 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnCameraPerm.isEnabled = !camOk
+    }
+
+    private companion object {
+        const val BUTTON_SIZE_MIN_DP = 36
+        const val BUTTON_SIZE_MAX_DP = 84
+        const val BUTTON_ALPHA_MIN_PERCENT = 20
+        const val POPUP_OFFSET_Y_MIN_DP = -40
+        const val POPUP_OFFSET_Y_MAX_DP = 200
+        const val POPUP_OFFSET_X_MIN_DP = -120
+        const val POPUP_OFFSET_X_MAX_DP = 120
+        const val POPUP_SIZE_MIN_DP = 180
+        const val POPUP_SIZE_MAX_DP = 380
+        const val POPUP_SIZE_DEFAULT_DP = 300
     }
 }

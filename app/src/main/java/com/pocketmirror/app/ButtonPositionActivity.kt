@@ -1,6 +1,5 @@
 package com.pocketmirror.app
 
-import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
@@ -8,6 +7,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
@@ -34,12 +34,19 @@ class ButtonPositionActivity : AppCompatActivity() {
         draggableButton = findViewById(R.id.draggableButtonPreview)
 
         // Aperçu à la taille réelle configurée
-        val btnSizePx = (MirrorPrefs.getButtonSizeDp(this) * resources.displayMetrics.density).toInt()
+        val btnSizePx = pxFromDp(MirrorPrefs.getButtonSizeDp(this))
         draggableButton.layoutParams = draggableButton.layoutParams.apply {
             width = btnSizePx
             height = btnSizePx
         }
         draggableButton.alpha = MirrorPrefs.getButtonAlpha(this)
+        // L'aperçu doit refléter la taille réelle : l'icône suit le diamètre du bouton.
+        val icon = findViewById<ImageView>(R.id.previewMirrorIcon)
+        val iconSizePx = (btnSizePx * 24f / 54f).toInt()
+        icon.layoutParams = icon.layoutParams.apply {
+            width = iconSizePx
+            height = iconSizePx
+        }
         val btnReset = findViewById<Button>(R.id.btnResetPosition)
         val btnSave = findViewById<Button>(R.id.btnSavePosition)
 
@@ -75,6 +82,7 @@ class ButtonPositionActivity : AppCompatActivity() {
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     view.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
+                    if (event.actionMasked == MotionEvent.ACTION_UP) view.performClick()
                     true
                 }
                 else -> false
@@ -89,8 +97,8 @@ class ButtonPositionActivity : AppCompatActivity() {
 
         btnSave.setOnClickListener {
             MirrorPrefs.setButtonPositionRatio(this, currentXRatio, currentYRatio)
-            sendBroadcast(Intent(MirrorPrefs.ACTION_PREFS_CHANGED).setPackage(packageName))
-            Toast.makeText(this, "Emplacement enregistré", Toast.LENGTH_SHORT).show()
+            MirrorPrefs.notifyChanged(this)
+            Toast.makeText(this, R.string.toast_position_saved, Toast.LENGTH_SHORT).show()
             finish()
         }
     }

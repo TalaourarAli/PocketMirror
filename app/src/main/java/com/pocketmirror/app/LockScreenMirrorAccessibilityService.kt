@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
+import android.annotation.SuppressLint
 import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -24,6 +25,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.AccelerateInterpolator
 import android.widget.FrameLayout
+import android.widget.ImageView
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -41,8 +43,12 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         const val ACTION_DEBUG_OPEN = "com.pocketmirror.app.DEBUG_OPEN"
         const val ACTION_DEBUG_CLOSE = "com.pocketmirror.app.DEBUG_CLOSE"
 
+        /** L'icône occupe 24 dp sur les 54 dp du bouton d'origine. */
+        private const val ICON_SIZE_RATIO = 24f / 54f
+
         @Volatile
-        var isConnectedService: Boolean = false
+        var isRunning: Boolean = false
+            private set
     }
 
     private val lifecycleRegistry = LifecycleRegistry(this)
@@ -63,6 +69,7 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
     private var revealStarted = false
     private var cameraBound = false
     private var revealFallback: Runnable? = null
+    private var debugReceiverRegistered = false
 
     private val systemReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -78,13 +85,19 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
                     if (::windowManager.isInitialized) {
                         applyButtonAppearance()
                         updateLockButtonVisibility()
-                        maskedCard?.let { configurePopupLayoutAndShape(it) }
+                        maskedCard?.let {
+                            applyMirrorGeometry(it, MirrorPrefs.getGeometry(this@LockScreenMirrorAccessibilityService))
+                        }
                     }
                 }
             }
         }
     }
 
+    // Les flags explicites n'existent qu'à partir d'API 33 (TIRAMISU).
+    // En dessous, on ne peut pas les passer : ces receivers sont locaux dans les faits,
+    // et seule l'action de debug (absente en release) est réellement sensible.
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onCreate() {
         super.onCreate()
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
@@ -105,15 +118,20 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
             registerReceiver(systemReceiver, filter)
         }
 
-        // Receiver de debug : permet de tester l'overlay depuis adb sans verrouiller l'écran
-        val debugFilter = IntentFilter().apply {
-            addAction(ACTION_DEBUG_OPEN)
-            addAction(ACTION_DEBUG_CLOSE)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(debugReceiver, debugFilter, RECEIVER_EXPORTED)
-        } else {
-            registerReceiver(debugReceiver, debugFilter)
+        // Receiver de debug : permet de tester l'overlay depuis adb sans verrouiller l'écran.
+        // En release il n'est jamais enregistré : sinon n'importe quelle app pourrait ouvrir
+        // la caméra sur l'écran verrouillé via un broadcast explicite.
+        if (BuildConfig.DEBUG) {
+            val debugFilter = IntentFilter().apply {
+                addAction(ACTION_DEBUG_OPEN)
+                addAction(ACTION_DEBUG_CLOSE)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(debugReceiver, debugFilter, RECEIVER_EXPORTED)
+            } else {
+                registerReceiver(debugReceiver, debugFilter)
+            }
+            debugReceiverRegistered = true
         }
 
         // Réagit aux passages écran allumé <-> AOD <-> éteint (AOD = STATE_DOZE)
@@ -147,7 +165,7 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         // Avec targetSdk 36+, il faut récupérer le WindowManager APRÈS onServiceConnected
         // pour qu'il porte le WindowToken de l'AccessibilityService (évite BadTokenException)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        isConnectedService = true
+        isRunning = true
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
         ensureButtonCreated()
         updateLockButtonVisibility()
@@ -160,10 +178,13 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
     override fun onInterrupt() {}
 
     override fun onDestroy() {
-        isConnectedService = false
+        isRunning = false
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         runCatching { unregisterReceiver(systemReceiver) }
-        runCatching { unregisterReceiver(debugReceiver) }
+        if (debugReceiverRegistered) {
+            runCatching { unregisterReceiver(debugReceiver) }
+            debugReceiverRegistered = false
+        }
         runCatching {
             getSystemService(DisplayManager::class.java)?.unregisterDisplayListener(displayListener)
         }
@@ -192,6 +213,9 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
      * Trouve le bord supérieur (ou bas selon besoin) du poinçon caméra frontale.
      * Collé à la caméra = top du poinçon (ou 0 si pas de cutout détecté).
      */
+    // `status_bar_height` n'est pas une ressource publique : c'est un repli volontaire
+    // pour les API 26-29 qui n'exposent pas DisplayCutout ici.
+    @SuppressLint("DiscouragedApi", "InternalInsetResource")
     private fun getCameraCutoutAnchorY(): Int {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val cutout = windowManager.maximumWindowMetrics.windowInsets.displayCutout
@@ -203,7 +227,10 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
                 }
             }
         }
-        return 0
+        // API 26-29 n'expose pas DisplayCutout ici : le poinçon est dans la barre d'état,
+        // on s'aligne donc sur sa hauteur plutôt que de tout coller à 0.
+        val statusBarId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (statusBarId > 0) resources.getDimensionPixelSize(statusBarId) else 0
     }
 
     /**
@@ -258,8 +285,10 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         val yRatio = MirrorPrefs.getButtonYRatio(this)
 
         params.gravity = Gravity.TOP or Gravity.START
-        params.x = ((screenW * xRatio) - btnSize / 2f).toInt().coerceIn(0, screenW - btnSize)
-        params.y = ((screenH * yRatio) - btnSize / 2f).toInt().coerceIn(0, screenH - btnSize)
+        val maxX = (screenW - btnSize).coerceAtLeast(0)
+        val maxY = (screenH - btnSize).coerceAtLeast(0)
+        params.x = ((screenW * xRatio) - btnSize / 2f).toInt().coerceIn(0, maxX)
+        params.y = ((screenH * yRatio) - btnSize / 2f).toInt().coerceIn(0, maxY)
 
         if (view.isAttachedToWindow) {
             runCatching { windowManager.updateViewLayout(view, params) }
@@ -269,15 +298,28 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
     private fun applyButtonAppearance() {
         val view = buttonView ?: return
         view.alpha = MirrorPrefs.getButtonAlpha(this)
+
+        // L'icône doit suivre la taille du bouton, sinon agrandir le bouton
+        // n'agrandit que son fond.
+        val btnSizePx = pxFromDp(MirrorPrefs.getButtonSizeDp(this))
+        view.findViewById<ImageView>(R.id.lockButtonIcon)?.let { icon ->
+            val iconSizePx = (btnSizePx * ICON_SIZE_RATIO).toInt()
+            icon.layoutParams = icon.layoutParams.apply {
+                width = iconSizePx
+                height = iconSizePx
+            }
+        }
         applyButtonPosition()
     }
 
+    // Ces deux layouts sont des overlays WindowManager : il n'existe aucun parent
+    // au moment de l'inflation, le `null` est donc volontaire.
+    @SuppressLint("InflateParams")
     private fun ensureButtonCreated() {
         if (buttonView != null) return
 
         val view = LayoutInflater.from(this).inflate(R.layout.overlay_lock_button, null)
-        val density = resources.displayMetrics.density
-        val btnSize = (MirrorPrefs.getButtonSizeDp(this) * density).toInt()
+        val btnSize = pxFromDp(MirrorPrefs.getButtonSizeDp(this))
 
         val params = WindowManager.LayoutParams(
             btnSize,
@@ -292,22 +334,22 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
 
         buttonView = view
         buttonParams = params
-        view.alpha = MirrorPrefs.getButtonAlpha(this)
-        applyButtonPosition()
+        applyButtonAppearance()
 
         view.setOnTouchListener { v, event ->
             val mode = MirrorPrefs.getInteractionMode(this)
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     v.animate().scaleX(0.9f).scaleY(0.9f).setDuration(80).start()
-                    if (mode == MirrorPrefs.MODE_HOLD) {
+                    if (mode == InteractionMode.HOLD) {
                         openMirrorOverlay()
                     }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
                     v.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
-                    if (mode == MirrorPrefs.MODE_HOLD) {
+                    v.performClick()
+                    if (mode == InteractionMode.HOLD) {
                         closeMirrorAnimated()
                     } else {
                         if (isMirrorOpen) {
@@ -320,7 +362,7 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
                 }
                 MotionEvent.ACTION_CANCEL -> {
                     v.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
-                    if (mode == MirrorPrefs.MODE_HOLD) {
+                    if (mode == InteractionMode.HOLD) {
                         closeMirrorAnimated()
                     }
                     true
@@ -332,33 +374,22 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         windowManager.addView(view, params)
     }
 
-    private fun configurePopupLayoutAndShape(card: MaskedMirrorContainer) {
-        val density = resources.displayMetrics.density
-        val shape = MirrorPrefs.getMirrorShape(this)
-        val baseSizePx = (MirrorPrefs.getPopupSizeDp(this) * density).toInt()
-        val offsetXPx = (MirrorPrefs.getPopupOffsetXDp(this) * density).toInt()
-        val offsetYPx = (MirrorPrefs.getPopupOffsetYDp(this) * density).toInt()
+    private fun applyMirrorGeometry(card: MaskedMirrorContainer, geometry: MirrorGeometry) {
+        val baseSizePx = pxFromDp(geometry.sizeDp)
+        val offsetXPx = pxFromDp(geometry.offsetXDp)
+        val offsetYPx = pxFromDp(geometry.offsetYDp)
         val cutoutTopPx = getCameraCutoutAnchorY()
 
         val lp = card.layoutParams as FrameLayout.LayoutParams
         lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-
-        when (shape) {
-            MirrorPrefs.SHAPE_PILL -> {
-                lp.width = baseSizePx
-                lp.height = (baseSizePx * 1.32f).toInt()
-            }
-            else -> {
-                lp.width = baseSizePx
-                lp.height = baseSizePx
-            }
-        }
+        lp.width = baseSizePx
+        lp.height = (baseSizePx * geometry.shape.heightRatio).toInt()
 
         // Collé au poinçon caméra par défaut + offset choisi par l'utilisateur
         lp.topMargin = (cutoutTopPx + offsetYPx).coerceAtLeast(0)
         card.translationX = offsetXPx.toFloat()
         card.layoutParams = lp
-        card.shapeMode = shape
+        card.shapeMode = geometry.shape
     }
 
     private fun openMirrorOverlay() {
@@ -371,9 +402,8 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         val card = ensureOverlayWindow() ?: return
         val preview = previewView ?: return
 
-        configurePopupLayoutAndShape(card)
+        applyMirrorGeometry(card, MirrorPrefs.getGeometry(this))
         card.revealProgress = 0f
-
         if (cameraBound && preview.previewStreamState.value == PreviewView.StreamState.STREAMING) {
             // Caméra déjà chaude (pré-chauffée sur l'écran de verrouillage) -> ouverture immédiate
             Log.d(TAG, "camera already streaming -> immediate reveal")
@@ -391,6 +421,7 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
      * Crée la fenêtre de l'overlay une seule fois et la garde en mémoire (invisible, clip 1px).
      * Évite le coût d'inflation + addView à chaque appui.
      */
+    @SuppressLint("InflateParams")
     private fun ensureOverlayWindow(): MaskedMirrorContainer? {
         if (mirrorContainerWindow == null) {
             val created = LayoutInflater.from(this).inflate(R.layout.overlay_lock_mirror, null)
@@ -415,7 +446,6 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
             val preview = created.findViewById<PreviewView>(R.id.lockPreviewView).apply {
                 // COMPATIBLE utilise TextureView -> pas de surface noire rectangulaire
                 implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                scaleX = 1f
             }
 
             card.revealProgress = 0f
@@ -423,7 +453,7 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
             maskedCard = card
             previewView = preview
 
-            configurePopupLayoutAndShape(card)
+            applyMirrorGeometry(card, MirrorPrefs.getGeometry(this))
             windowManager.addView(created, params)
             preview.previewStreamState.observeForever(streamObserver)
             Log.d(TAG, "overlay window created (pre-inflated)")

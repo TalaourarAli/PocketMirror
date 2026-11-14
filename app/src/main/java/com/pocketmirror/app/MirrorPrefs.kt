@@ -1,6 +1,7 @@
 package com.pocketmirror.app
 
 import android.content.Context
+import android.content.Intent
 
 object MirrorPrefs {
     private const val PREFS_NAME = "pocket_mirror_prefs"
@@ -17,29 +18,38 @@ object MirrorPrefs {
     private const val KEY_BTN_ALPHA = "button_alpha"
     private const val KEY_TEST_ALWAYS = "test_show_always"
 
-    const val MODE_HOLD = "HOLD"
-    const val MODE_TOGGLE = "TOGGLE"
-
-    const val SHAPE_CIRCLE = "CIRCLE"
-    const val SHAPE_ROUNDED_SQ = "ROUNDED_SQ"
-    const val SHAPE_PILL = "PILL"
-
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun getInteractionMode(context: Context): String =
-        prefs(context).getString(KEY_MODE, MODE_HOLD) ?: MODE_HOLD
-
-    fun setInteractionMode(context: Context, mode: String) {
-        prefs(context).edit().putString(KEY_MODE, mode).apply()
+    /**
+     * Prévient le service d'accessibilité qu'un réglage a changé.
+     * Centralisé ici : deux activités émettaient le même broadcast à la main.
+     */
+    fun notifyChanged(context: Context) {
+        context.sendBroadcast(Intent(ACTION_PREFS_CHANGED).setPackage(context.packageName))
     }
 
-    fun getMirrorShape(context: Context): String =
-        prefs(context).getString(KEY_SHAPE, SHAPE_CIRCLE) ?: SHAPE_CIRCLE
+    fun getInteractionMode(context: Context): InteractionMode =
+        InteractionMode.fromKey(prefs(context).getString(KEY_MODE, null))
 
-    fun setMirrorShape(context: Context, shape: String) {
-        prefs(context).edit().putString(KEY_SHAPE, shape).apply()
+    fun setInteractionMode(context: Context, mode: InteractionMode) {
+        prefs(context).edit().putString(KEY_MODE, mode.key).apply()
     }
+
+    fun getMirrorShape(context: Context): MirrorShape =
+        MirrorShape.fromKey(prefs(context).getString(KEY_SHAPE, null))
+
+    fun setMirrorShape(context: Context, shape: MirrorShape) {
+        prefs(context).edit().putString(KEY_SHAPE, shape.key).apply()
+    }
+
+    /** Tous les réglages de la fenêtre du miroir, lus en une fois. */
+    fun getGeometry(context: Context) = MirrorGeometry(
+        shape = getMirrorShape(context),
+        sizeDp = getPopupSizeDp(context),
+        offsetXDp = getPopupOffsetXDp(context),
+        offsetYDp = getPopupOffsetYDp(context),
+    )
 
     fun getButtonXRatio(context: Context): Float =
         prefs(context).getFloat(KEY_BTN_X_RATIO, 0.5f)
