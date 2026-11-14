@@ -69,22 +69,21 @@ class MaskedMirrorContainer @JvmOverloads constructor(
     override fun dispatchDraw(canvas: Canvas) {
         if (width == 0 || height == 0) return
 
-        // Si progress <= 0, on ne dessine rien à l'écran MAIS il ne faut surtout pas bloquer
-        // l'initialisation du SurfaceTexture interne de TextureView au 1er layout !
-        // On laisse donc au moins un alpha/scale infime ou on clippe hors champ tant que revealProgress == 0f
-        if (revealProgress <= 0.005f) {
-            val s = canvas.save()
-            canvas.clipRect(0f, 0f, 0f, 0f)
-            super.dispatchDraw(canvas)
-            canvas.restoreToCount(s)
-            return
-        }
-
         val saveCount = canvas.save()
 
         // Sort directement du poinçon de la caméra (haut-centre : width/2, 0)
         val pivotX = width / 2f
         val pivotY = 0f
+
+        if (revealProgress <= 0.004f) {
+            // On dessine malgré tout (clip 1px) pour que le TextureView crée sa surface GPU,
+            // sinon CameraX reste bloqué sur "surface requested" et la preview n'arrive jamais.
+            canvas.clipRect(pivotX, pivotY, pivotX + 1f, pivotY + 1f)
+            super.dispatchDraw(canvas)
+            canvas.restoreToCount(saveCount)
+            return
+        }
+
         canvas.scale(revealProgress, revealProgress, pivotX, pivotY)
 
         // Découpe stricte selon la forme choisie -> zéro rectangle noir !

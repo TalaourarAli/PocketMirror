@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.PixelFormat
 import android.os.Build
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -28,10 +29,15 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.Observer
 
 class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOwner {
 
     companion object {
+        private const val TAG = "PocketMirrorSvc"
+        const val ACTION_DEBUG_OPEN = "com.pocketmirror.app.DEBUG_OPEN"
+        const val ACTION_DEBUG_CLOSE = "com.pocketmirror.app.DEBUG_CLOSE"
+
         @Volatile
         var isConnectedService: Boolean = false
     }
@@ -51,7 +57,9 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
     private var cameraProvider: ProcessCameraProvider? = null
     private var currentAnimator: ValueAnimator? = null
     private var isMirrorOpen = false
-    private var waitingFirstFrame = false
+    private var revealStarted = false
+    private var cameraBound = false
+    private var revealFallback: Runnable? = null
 
     private val systemReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -60,7 +68,8 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
                 Intent.ACTION_USER_PRESENT -> updateLockButtonVisibility()
                 Intent.ACTION_SCREEN_OFF -> {
                     closeMirrorImmediate()
-                    updateLockButtonVisibility()
+                    releaseCamera()
+                    updateLockButtonVisibility(warmCamera = false)
                 }
                 MirrorPrefs.ACTION_PREFS_CHANGED -> {
                     if (::windowManager.isInitialized) {
@@ -92,6 +101,26 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         } else {
             registerReceiver(systemReceiver, filter)
         }
+
+        // Receiver de debug : permet de tester l'overlay depuis adb sans verrouiller l'écran
+        val debugFilter = IntentFilter().apply {
+            addAction(ACTION_DEBUG_OPEN)
+            addAction(ACTION_DEBUG_CLOSE)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(debugReceiver, debugFilter, RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(debugReceiver, debugFilter)
+        }
+    }
+
+    private val debugReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                ACTION_DEBUG_OPEN -> openMirrorOverlay()
+                ACTION_DEBUG_CLOSE -> closeMirrorAnimated()
+            }
+        }
     }
 
     override fun onServiceConnected() {
@@ -115,7 +144,10 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         isConnectedService = false
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         runCatching { unregisterReceiver(systemReceiver) }
+        runCatching { unregisterReceiver(debugReceiver) }
         closeMirrorImmediate()
+        removeOverlayWindow()
+        releaseCamera()
         if (::windowManager.isInitialized) {
             buttonView?.let { runCatching { windowManager.removeView(it) } }
         }
@@ -152,12 +184,21 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         return 0
     }
 
-    private fun updateLockButtonVisibility() {
+    private fun updateLockButtonVisibility(warmCamera: Boolean = true) {
         val btn = buttonView ?: return
         val shouldShow = keyguardManager.isKeyguardLocked || MirrorPrefs.getTestShowAlways(this)
         btn.visibility = if (shouldShow) View.VISIBLE else View.GONE
-        if (!shouldShow && isMirrorOpen) {
-            closeMirrorImmediate()
+
+        if (shouldShow) {
+            // Prépare la fenêtre + pré-chauffe la caméra pendant que l'écran est verrouillé,
+            // pour que l'appui ouvre le miroir quasi instantanément.
+            ensureOverlayWindow()
+            if (warmCamera) preWarmCamera()
+        } else {
+            if (isMirrorOpen) {
+                closeMirrorImmediate()
+            }
+            releaseCamera()
         }
     }
 
@@ -271,53 +312,120 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
     private fun openMirrorOverlay() {
         if (isMirrorOpen) return
         isMirrorOpen = true
+        revealStarted = false
         currentAnimator?.cancel()
+        Log.d(TAG, "openMirrorOverlay")
 
-        val root = mirrorContainerWindow ?: LayoutInflater.from(this)
-            .inflate(R.layout.overlay_lock_mirror, null).also { created ->
-                val params = WindowManager.LayoutParams(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                        WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
-                        WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
-                    PixelFormat.TRANSLUCENT
-                )
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    params.layoutInDisplayCutoutMode =
-                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-                }
-                mirrorContainerWindow = created
-                maskedCard = created.findViewById(R.id.circleMirrorContainer)
-                previewView = created.findViewById<PreviewView>(R.id.lockPreviewView).apply {
-                    // COMPATIBLE utilise TextureView -> zéro SurfaceView noire rectangulaire !
-                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                    scaleX = 1f
-                }
-                windowManager.addView(created, params)
-            }
-
-        val card = maskedCard ?: return
+        val card = ensureOverlayWindow() ?: return
         val preview = previewView ?: return
 
         configurePopupLayoutAndShape(card)
-
-        // Reste invisible (progress = 0) tant que la 1ère frame vidéo n'est pas prête -> aucun flash noir !
         card.revealProgress = 0f
-        waitingFirstFrame = true
 
-        preview.previewStreamState.observe(this) { state ->
-            if (isMirrorOpen && waitingFirstFrame && state == PreviewView.StreamState.STREAMING) {
-                waitingFirstFrame = false
-                animateReveal(card, toOpen = true)
-            }
+        if (cameraBound && preview.previewStreamState.value == PreviewView.StreamState.STREAMING) {
+            // Caméra déjà chaude (pré-chauffée sur l'écran de verrouillage) -> ouverture immédiate
+            Log.d(TAG, "camera already streaming -> immediate reveal")
+            maybeStartReveal(false)
+        } else {
+            preWarmCamera()
+            revealFallback = Runnable {
+                Log.d(TAG, "reveal fallback fired")
+                maybeStartReveal(true)
+            }.also { card.postDelayed(it, 150L) }
         }
+    }
 
-        startFrontCamera(preview)
+    /**
+     * Crée la fenêtre de l'overlay une seule fois et la garde en mémoire (invisible, clip 1px).
+     * Évite le coût d'inflation + addView à chaque appui.
+     */
+    private fun ensureOverlayWindow(): MaskedMirrorContainer? {
+        if (mirrorContainerWindow == null) {
+            val created = LayoutInflater.from(this).inflate(R.layout.overlay_lock_mirror, null)
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
+                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
+                PixelFormat.TRANSLUCENT
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                params.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+
+            val card = created.findViewById<MaskedMirrorContainer>(R.id.circleMirrorContainer)
+            val preview = created.findViewById<PreviewView>(R.id.lockPreviewView).apply {
+                // COMPATIBLE utilise TextureView -> pas de surface noire rectangulaire
+                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                scaleX = 1f
+            }
+
+            card.revealProgress = 0f
+            mirrorContainerWindow = created
+            maskedCard = card
+            previewView = preview
+
+            configurePopupLayoutAndShape(card)
+            windowManager.addView(created, params)
+            preview.previewStreamState.observeForever(streamObserver)
+            Log.d(TAG, "overlay window created (pre-inflated)")
+        }
+        return maskedCard
+    }
+
+    private fun preWarmCamera() {
+        if (cameraBound) return
+        val preview = previewView ?: return
+        Log.d(TAG, "pre-warming camera")
+        val future = ProcessCameraProvider.getInstance(this)
+        future.addListener({
+            if (cameraBound) return@addListener
+            val provider = future.get()
+            cameraProvider = provider
+            val useCase = Preview.Builder().build().also {
+                it.setSurfaceProvider(preview.surfaceProvider)
+            }
+            runCatching {
+                provider.unbindAll()
+                provider.bindToLifecycle(this, CameraSelector.DEFAULT_FRONT_CAMERA, useCase)
+                cameraBound = true
+                Log.d(TAG, "camera bound (pre-warm)")
+            }.onFailure {
+                Log.e(TAG, "preWarm bind failed", it)
+            }
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun releaseCamera() {
+        if (!cameraBound) return
+        cameraBound = false
+        runCatching { cameraProvider?.unbindAll() }
+        Log.d(TAG, "camera released")
+    }
+
+    private val streamObserver = Observer<PreviewView.StreamState> { state ->
+        Log.d(TAG, "previewStreamState=$state")
+        if (state == PreviewView.StreamState.STREAMING) {
+            maybeStartReveal(false)
+        }
+    }
+
+    private fun maybeStartReveal(fromFallback: Boolean) {
+        if (!isMirrorOpen || revealStarted) return
+        val card = maskedCard ?: return
+        revealStarted = true
+        revealFallback?.let { card.removeCallbacks(it) }
+        revealFallback = null
+        if (fromFallback) {
+            Log.w(TAG, "STREAMING not received, revealing anyway")
+        }
+        animateReveal(card, toOpen = true)
     }
 
     private fun animateReveal(card: MaskedMirrorContainer, toOpen: Boolean, onEnd: (() -> Unit)? = null) {
@@ -345,7 +453,8 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
     private fun closeMirrorAnimated() {
         if (!isMirrorOpen) return
         isMirrorOpen = false
-        waitingFirstFrame = false
+        revealStarted = false
+        Log.d(TAG, "closeMirrorAnimated")
 
         val card = maskedCard
         if (card == null || card.revealProgress <= 0.02f) {
@@ -362,32 +471,29 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
 
     private fun closeMirrorImmediate() {
         isMirrorOpen = false
-        waitingFirstFrame = false
+        revealStarted = false
         currentAnimator?.cancel()
         currentAnimator = null
-        cameraProvider?.unbindAll()
-        previewView?.previewStreamState?.removeObservers(this)
+        val card = maskedCard
+        revealFallback?.let { card?.removeCallbacks(it) }
+        revealFallback = null
+        // On garde la fenêtre pré-inflatée en mémoire et on cache juste le contenu
+        card?.revealProgress = 0f
+
+        // La caméra reste chaude tant que l'écran de verrouillage / le mode test est actif
+        val keepWarm = keyguardManager.isKeyguardLocked || MirrorPrefs.getTestShowAlways(this)
+        if (!keepWarm) {
+            releaseCamera()
+        }
+    }
+
+    private fun removeOverlayWindow() {
+        runCatching { previewView?.previewStreamState?.removeObserver(streamObserver) }
         if (::windowManager.isInitialized) {
             mirrorContainerWindow?.let { runCatching { windowManager.removeView(it) } }
         }
         mirrorContainerWindow = null
         maskedCard = null
         previewView = null
-    }
-
-    private fun startFrontCamera(previewView: PreviewView) {
-        val future = ProcessCameraProvider.getInstance(this)
-        future.addListener({
-            if (!isMirrorOpen) return@addListener
-            val provider = future.get()
-            cameraProvider = provider
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(previewView.surfaceProvider)
-            }
-            runCatching {
-                provider.unbindAll()
-                provider.bindToLifecycle(this, CameraSelector.DEFAULT_FRONT_CAMERA, preview)
-            }
-        }, ContextCompat.getMainExecutor(this))
     }
 }
