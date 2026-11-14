@@ -63,9 +63,11 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
                     updateLockButtonVisibility()
                 }
                 MirrorPrefs.ACTION_PREFS_CHANGED -> {
-                    applyButtonPosition()
-                    updateLockButtonVisibility()
-                    maskedCard?.let { configurePopupLayoutAndShape(it) }
+                    if (::windowManager.isInitialized) {
+                        applyButtonPosition()
+                        updateLockButtonVisibility()
+                        maskedCard?.let { configurePopupLayoutAndShape(it) }
+                    }
                 }
             }
         }
@@ -74,7 +76,6 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
     override fun onCreate() {
         super.onCreate()
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
-        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         keyguardManager = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
 
         // Pré-initialise ProcessCameraProvider pour accélérer l'ouverture
@@ -95,6 +96,9 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        // Avec targetSdk 36+, il faut récupérer le WindowManager APRÈS onServiceConnected
+        // pour qu'il porte le WindowToken de l'AccessibilityService (évite BadTokenException)
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         isConnectedService = true
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
         ensureButtonCreated()
@@ -112,7 +116,9 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         runCatching { unregisterReceiver(systemReceiver) }
         closeMirrorImmediate()
-        buttonView?.let { runCatching { windowManager.removeView(it) } }
+        if (::windowManager.isInitialized) {
+            buttonView?.let { runCatching { windowManager.removeView(it) } }
+        }
         buttonView = null
         buttonParams = null
         super.onDestroy()
@@ -361,7 +367,9 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         currentAnimator = null
         cameraProvider?.unbindAll()
         previewView?.previewStreamState?.removeObservers(this)
-        mirrorContainerWindow?.let { runCatching { windowManager.removeView(it) } }
+        if (::windowManager.isInitialized) {
+            mirrorContainerWindow?.let { runCatching { windowManager.removeView(it) } }
+        }
         mirrorContainerWindow = null
         maskedCard = null
         previewView = null
