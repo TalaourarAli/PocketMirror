@@ -3,6 +3,8 @@
 Un miroir de poche sur l'écran verrouillé Android : un petit bouton flottant
 ouvre la caméra frontale en superposition, sans déverrouiller le téléphone.
 
+> Co-codé avec OpenCode (Gemini + DeepSeek).
+
 ![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84)
 ![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF)
 ![License](https://img.shields.io/badge/License-MIT-blue)
@@ -110,6 +112,59 @@ keytool -genkeypair -v -keystore pocketmirror.jks -alias pocketmirror \
 
 L'option « Afficher aussi déverrouillé » permet de tester le bouton sans
 verrouiller l'écran.
+
+## Intégration continue et releases
+
+Deux workflows GitHub Actions sont fournis :
+
+| Workflow | Déclencheur | Ce qu'il fait |
+|---|---|---|
+| `.github/workflows/android.yml` | push sur `master`/`main`, pull request, manuel | `assembleDebug` + `lintDebug`, APK de debug en artefact. **Ne publie rien.** |
+| `.github/workflows/release.yml` | push d'un tag `v*`, manuel | Vérifie que le tag correspond à `versionName`, construit l'APK de **release**, le signe si les secrets sont présents, puis crée une **GitHub Release** avec notes générées et APK attaché |
+
+Autrement dit : **pousser du code ne publie pas de release**, seul le push d'un
+tag le fait.
+
+### Publier une version
+
+1. Mettre à jour `versionCode` et `versionName` dans `app/build.gradle.kts`.
+2. Commiter, puis taguer avec le même numéro :
+
+   ```bash
+   git tag -a v1.8 -m "Version 1.8 (versionCode 8)"
+   git push origin master        # ou main
+   git push origin v1.8          # ou: git push --tags
+   ```
+
+3. Le workflow `Release` vérifie la cohérence tag / `versionName`, construit
+   l'APK et le publie sur la page Releases du dépôt.
+
+### Secrets de signature (fortement recommandés)
+
+Sans eux, la release est publiée avec un APK **non signé** ; Android refuse
+d'ailleurs d'installer un APK non signé par-dessus une version déjà installée.
+À ajouter dans **Settings → Secrets and variables → Actions** :
+
+| Secret | Contenu |
+|---|---|
+| `KEYSTORE_BASE64` | le keystore encodé en base64 (voir ci-dessous) |
+| `KEYSTORE_PASSWORD` | mot de passe du keystore (`storePassword`) |
+| `KEY_ALIAS` | alias de la clé (`keyAlias`) |
+| `KEY_PASSWORD` | mot de passe de la clé (`keyPassword`) |
+
+Encodage du keystore :
+
+```bash
+base64 -w0 pocketmirror.jks > keystore.b64   # Linux
+base64 -i pocketmirror.jks -o keystore.b64   # macOS
+```
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("pocketmirror.jks")) | Set-Content keystore.b64
+```
+
+> Le workflow de release peut aussi être lancé à la main
+> (**Actions → Release → Run workflow**) en indiquant un tag existant.
 
 ## Réglages disponibles
 

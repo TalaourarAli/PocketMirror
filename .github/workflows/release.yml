@@ -1,0 +1,94 @@
+name: Release
+
+# Se déclenche uniquement quand un tag de version est poussé (v1.7, v1.8, ...).
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag à publier (doit déjà exister, ex. v1.7)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Déterminer le tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [ "$EVENT_NAME" = "push" ]; then
+            TAG="$GITHUB_REF_NAME"
+          else
+            TAG="$INPUT_TAG"
+          fi
+          echo "TAG_NAME=$TAG" >> "$GITHUB_ENV"
+          echo "Tag ciblé : $TAG"
+
+      - name: Vérifier que le tag correspond à versionName
+        run: |
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          if [ "v$VERSION" != "$TAG_NAME" ]; then
+            echo "::error::Le tag $TAG_NAME ne correspond pas à versionName=$VERSION"
+            exit 1
+          fi
+          echo "Tag et version cohérents : v$VERSION"
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: SDK Android
+        uses: android-actions/setup-android@v3
+
+      - name: Préparer la signature
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+            printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+              "$GITHUB_WORKSPACE/release.jks" "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" \
+              > keystore.properties
+            echo "Signature configurée."
+          else
+            echo "::warning::Secrets de signature absents : l'APK publié sera NON SIGNÉ."
+          fi
+
+      - name: Rendre gradlew exécutable
+        run: chmod +x gradlew
+
+      - name: Construire l'APK de release
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: Nommer l'APK
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/PocketMirror-${TAG_NAME}.apk"
+          ls -lh dist
+
+      - name: Publier la release GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: PocketMirror ${{ env.TAG_NAME }}
+          generate_release_notes: true
+          files: dist/PocketMirror-*.apk
+          fail_on_unmatched_files: true
