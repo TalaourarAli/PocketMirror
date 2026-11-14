@@ -391,6 +391,7 @@ class LockScreenMirrorAccessibilityService : AccessibilityService(), LifecycleOw
         card.translationX = offsetXPx.toFloat()
         card.layoutParams = lp
         card.shapeMode = geometry.shape
+        card.frameMode = geometry.frame
     }
 
     private fun openMirrorOverlay() {

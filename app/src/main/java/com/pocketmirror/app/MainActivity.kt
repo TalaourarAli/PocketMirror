@@ -21,6 +21,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnAccessibility: Button
     private lateinit var rgInteractionMode: RadioGroup
     private lateinit var rgMirrorShape: RadioGroup
+    private lateinit var rgMirrorFrame: RadioGroup
     private lateinit var tvPopupOffsetY: TextView
     private lateinit var sbPopupOffsetY: SeekBar
     private lateinit var tvPopupOffsetX: TextView
@@ -50,6 +51,7 @@ class MainActivity : AppCompatActivity() {
         btnAccessibility = findViewById(R.id.btnAccessibility)
         rgInteractionMode = findViewById(R.id.rgInteractionMode)
         rgMirrorShape = findViewById(R.id.rgMirrorShape)
+        rgMirrorFrame = findViewById(R.id.rgMirrorFrame)
         tvPopupOffsetY = findViewById(R.id.tvPopupOffsetY)
         sbPopupOffsetY = findViewById(R.id.sbPopupOffsetY)
         tvPopupOffsetX = findViewById(R.id.tvPopupOffsetX)
@@ -74,6 +76,7 @@ class MainActivity : AppCompatActivity() {
 
         bindModeSelector()
         bindShapeSelector()
+        bindFrameSelector()
         setupPopupSliders()
         setupButtonAppearanceSliders()
 
@@ -107,6 +110,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun bindFrameSelector() {
+        rgMirrorFrame.check(radioForFrame(MirrorPrefs.getMirrorFrame(this)))
+        rgMirrorFrame.setOnCheckedChangeListener { _, checkedId ->
+            MirrorPrefs.setMirrorFrame(this, frameForRadio(checkedId))
+            notifyServicePrefsChanged()
+        }
+    }
+
     private fun modeForRadio(checkedId: Int): InteractionMode =
         if (checkedId == R.id.rbModeToggle) InteractionMode.TOGGLE else InteractionMode.HOLD
 
@@ -120,6 +131,20 @@ class MainActivity : AppCompatActivity() {
         MirrorShape.ROUNDED_SQ -> R.id.rbShapeRoundedSq
         MirrorShape.PILL -> R.id.rbShapePill
         MirrorShape.CIRCLE -> R.id.rbShapeCircle
+    }
+
+    private fun frameForRadio(checkedId: Int): MirrorFrame = when (checkedId) {
+        R.id.rbFrameNone -> MirrorFrame.NONE
+        R.id.rbFrameSmooth -> MirrorFrame.SMOOTH_BLUE
+        R.id.rbFrameGold -> MirrorFrame.GOLD
+        else -> MirrorFrame.SCALLOPED_BLUE
+    }
+
+    private fun radioForFrame(frame: MirrorFrame): Int = when (frame) {
+        MirrorFrame.NONE -> R.id.rbFrameNone
+        MirrorFrame.SMOOTH_BLUE -> R.id.rbFrameSmooth
+        MirrorFrame.GOLD -> R.id.rbFrameGold
+        MirrorFrame.SCALLOPED_BLUE -> R.id.rbFrameScalloped
     }
 
     /**

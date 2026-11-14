@@ -9,6 +9,7 @@ object MirrorPrefs {
 
     private const val KEY_MODE = "interaction_mode"
     private const val KEY_SHAPE = "mirror_shape"
+    private const val KEY_FRAME = "mirror_frame"
     private const val KEY_BTN_X_RATIO = "button_x_ratio"
     private const val KEY_BTN_Y_RATIO = "button_y_ratio"
     private const val KEY_POPUP_OFFSET_X_DP = "popup_offset_x_dp"
@@ -43,12 +44,20 @@ object MirrorPrefs {
         prefs(context).edit().putString(KEY_SHAPE, shape.key).apply()
     }
 
+    fun getMirrorFrame(context: Context): MirrorFrame =
+        MirrorFrame.fromKey(prefs(context).getString(KEY_FRAME, null))
+
+    fun setMirrorFrame(context: Context, frame: MirrorFrame) {
+        prefs(context).edit().putString(KEY_FRAME, frame.key).apply()
+    }
+
     /** Tous les réglages de la fenêtre du miroir, lus en une fois. */
     fun getGeometry(context: Context) = MirrorGeometry(
         shape = getMirrorShape(context),
         sizeDp = getPopupSizeDp(context),
         offsetXDp = getPopupOffsetXDp(context),
         offsetYDp = getPopupOffsetYDp(context),
+        frame = getMirrorFrame(context),
     )
 
     fun getButtonXRatio(context: Context): Float =

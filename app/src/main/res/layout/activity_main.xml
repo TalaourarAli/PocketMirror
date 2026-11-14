@@ -156,7 +156,54 @@
                 android:textColor="#E8EAF6" />
         </RadioGroup>
 
-        <!-- Option 3 : Ajuster la position & taille de la popup caméra -->
+        <!-- Option 3 : Cadre du miroir -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/section_frame"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <RadioGroup
+            android:id="@+id/rgMirrorFrame"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#1B1D29"
+            android:padding="10dp">
+
+            <RadioButton
+                android:id="@+id/rbFrameScalloped"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/frame_scalloped"
+                android:textColor="#E8EAF6" />
+
+            <RadioButton
+                android:id="@+id/rbFrameSmooth"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/frame_smooth"
+                android:textColor="#E8EAF6" />
+
+            <RadioButton
+                android:id="@+id/rbFrameGold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/frame_gold"
+                android:textColor="#E8EAF6" />
+
+            <RadioButton
+                android:id="@+id/rbFrameNone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/frame_none"
+                android:textColor="#E8EAF6" />
+        </RadioGroup>
+
+        <!-- Option 4 : Ajuster la position & taille de la popup caméra -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

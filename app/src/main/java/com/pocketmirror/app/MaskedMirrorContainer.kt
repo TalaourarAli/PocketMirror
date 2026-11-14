@@ -29,6 +29,14 @@ class MaskedMirrorContainer @JvmOverloads constructor(
             invalidate()
         }
 
+    /** Habillage du cadre : festonné, lisse, doré, ou aucun. */
+    var frameMode: MirrorFrame = MirrorFrame.SCALLOPED_BLUE
+        set(value) {
+            field = value
+            rebuildPaths()
+            invalidate()
+        }
+
     /** Progression de l'animation entre 0f (dans la caméra) et 1f (ouvert) */
     var revealProgress: Float = 0f
         set(value) {
@@ -69,27 +77,35 @@ class MaskedMirrorContainer @JvmOverloads constructor(
         val h = height.toFloat()
         if (w <= 0f || h <= 0f) return
 
-        val frame = frameWidthPx
-        if (frame <= 0f) return
-
         contentPath.reset()
         outerPath.reset()
         framePath.reset()
+
+        // Sans cadre, la découpe occupe toute la forme : le liseré interne reste
+        // le seul ornement.
+        val frame = if (frameMode.enabled) frameWidthPx else 0f
+        // Les festons n'ont de sens que sur un cercle ; sur un ovale ou un carré
+        // arrondi ils casseraient la forme.
+        val scalloped = frameMode.hasScallops && shapeMode == MirrorShape.CIRCLE
 
         if (shapeMode == MirrorShape.CIRCLE) {
             val centerX = w / 2f
             val centerY = h / 2f
             val outerRadius = min(w, h) / 2f
-            // Les festons mordent sur le bord extérieur, pas sur la découpe caméra.
-            val amplitude = frame * SCALLOP_DEPTH
-            buildScallopedCircle(
-                outerPath,
-                centerX,
-                centerY,
-                outerRadius - amplitude,
-                SCALLOP_LOBES,
-                amplitude
-            )
+            if (scalloped) {
+                // Les festons mordent sur le bord extérieur, pas sur la découpe caméra.
+                val amplitude = frame * SCALLOP_DEPTH
+                buildScallopedCircle(
+                    outerPath,
+                    centerX,
+                    centerY,
+                    outerRadius - amplitude,
+                    SCALLOP_LOBES,
+                    amplitude
+                )
+            } else {
+                outerPath.addCircle(centerX, centerY, outerRadius, Path.Direction.CW)
+            }
             contentPath.addCircle(centerX, centerY, outerRadius - frame, Path.Direction.CW)
         } else {
             shapeRect.set(0f, 0f, w, h)
@@ -98,8 +114,10 @@ class MaskedMirrorContainer @JvmOverloads constructor(
             addRoundedShape(contentPath, shapeRect, shapeMode)
         }
 
-        framePath.op(outerPath, contentPath, Path.Op.DIFFERENCE)
-        framePaint.shader = SweepGradient(w / 2f, h / 2f, FRAME_COLORS, FRAME_POSITIONS)
+        if (frameMode.enabled) {
+            framePath.op(outerPath, contentPath, Path.Op.DIFFERENCE)
+            framePaint.shader = SweepGradient(w / 2f, h / 2f, frameMode.colors, FRAME_POSITIONS)
+        }
     }
 
     private fun addRoundedShape(path: Path, rect: RectF, shape: MirrorShape) {
@@ -176,14 +194,6 @@ class MaskedMirrorContainer @JvmOverloads constructor(
 
         val TWO_PI = (2.0 * Math.PI).toFloat()
 
-        val FRAME_COLORS = intArrayOf(
-            0xFF8FD3FF.toInt(),
-            0xFF2F79C4.toInt(),
-            0xFFA9E0FF.toInt(),
-            0xFF1F5C9E.toInt(),
-            0xFF6FB7EC.toInt(),
-            0xFF8FD3FF.toInt(),
-        )
         val FRAME_POSITIONS = floatArrayOf(0f, 0.22f, 0.4f, 0.62f, 0.82f, 1f)
     }
 }

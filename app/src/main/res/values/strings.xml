@@ -18,6 +18,12 @@
     <string name="shape_rounded_sq">Carré aux coins arrondis</string>
     <string name="shape_pill">Ovale vertical (Portrait grand format)</string>
 
+    <string name="section_frame">Cadre du miroir</string>
+    <string name="frame_scalloped">Bleu festonné (miroir de poche)</string>
+    <string name="frame_smooth">Bleu lisse</string>
+    <string name="frame_gold">Doré</string>
+    <string name="frame_none">Aucun cadre</string>
+
     <string name="section_popup">Position &amp; taille de la popup</string>
     <string name="action_reset">Réinitialiser</string>
     <string name="popup_offset_y_label">Hauteur (collé à la caméra : 0 dp)</string>
