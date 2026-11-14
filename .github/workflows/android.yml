@@ -23,8 +23,20 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Préparer le SDK Android
+        run: |
+          # ubuntu-latest fournit déjà le SDK et ANDROID_HOME.
+          # On n'utilise pas android-actions/setup-android : il installe le
+          # paquet « tools », retiré du dépôt SDK par Google, et échoue.
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -type f -name sdkmanager | sort | tail -n1)
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::error::sdkmanager introuvable dans $ANDROID_HOME"
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "platform-tools" "platforms;android-36" \
+            "build-tools;34.0.0" "build-tools;36.0.0"
+          echo "SDK Android prêt : $ANDROID_HOME"
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
