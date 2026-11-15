@@ -1,208 +1,200 @@
 # PocketMirror
 
-**Français** · [English](README.en.md)
+**English** · [Français](README.fr.md)
 
-Un miroir de poche sur l'écran verrouillé Android : un petit bouton flottant
-ouvre la caméra frontale en superposition, sans déverrouiller le téléphone.
+A pocket mirror on your Android lock screen: a small floating button opens the
+front camera as an overlay, without unlocking the phone.
 
-> Co-codé avec OpenCode (Gemini + DeepSeek).
+> Co-developed with OpenCode (Gemini + DeepSeek).
 
 ![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84)
 ![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-7F52FF)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
-## Télécharger l'application
+## Download
 
-Vous ne voulez pas compiler ? L'APK prêt à installer est publié dans les
-**[Releases](https://github.com/TalaourarAli/PocketMirror/releases/latest)**.
+No need to compile: a ready-to-install APK is published on the
+**[Releases](https://github.com/TalaourarAli/PocketMirror/releases/latest)** page.
 
-1. Télécharger le fichier `.apk` de la dernière release sur le téléphone.
-2. Autoriser l'installation depuis cette source si Android le demande
-   (navigateur ou gestionnaire de fichiers → « Installer des applications
-   inconnues »).
-3. Ouvrir le fichier et installer.
+1. Download the `.apk` file from the latest release, on your phone.
+2. Allow installing from that source if Android asks (browser or file manager →
+   “Install unknown apps”).
+3. Open the file and install.
 
-L'APK est signé : les mises à jour s'installent **par-dessus** l'ancienne
-version, sans perdre les réglages. Seule condition : toujours la même clé de
-signature (voir [Signature](#signature-de-la-release)).
+The APK is signed, so updates install **on top of** the previous version and
+your settings are kept. The only requirement is always using the same signing
+key (see [Release signing](#release-signing)).
 
-**Prérequis** : Android 8.0 (API 26) ou plus récent, avec caméra frontale.
+**Requirements**: Android 8.0 (API 26) or newer, with a front camera.
 
-### Après installation
+### First run
 
-1. Lancer **PocketMirror** et accorder la permission **Caméra**.
-2. Appuyer sur **Service Lockscreen** et activer
-   « PocketMirror (Écran verrouillé) » dans les réglages d'accessibilité.
-3. Verrouiller l'écran : le bouton miroir apparaît.
+1. Open **PocketMirror** and grant the **Camera** permission.
+2. Tap **Service Lockscreen** and enable
+   “PocketMirror (Écran verrouillé)” in the accessibility settings.
+3. Lock the screen: the mirror button appears.
 
-L'option « Afficher aussi déverrouillé » permet de tester le bouton sans
-verrouiller l'écran.
+The “Show while unlocked” option lets you test the button without locking the
+screen.
 
-## Fonctionnalités
+## Features
 
-- **Miroir instantané** : la caméra frontale s'ouvre par-dessus l'écran de
-  verrouillage, plein cadre, sans quitter la session verrouillée.
-- **Bouton discret et personnalisable** : position libre sur l'écran
-  (glisser-déposer), taille de 36 à 84 dp, opacité de 20 à 100 %.
-- **Deux modes d'ouverture** :
-  - *Maintenir appuyé* : le miroir reste ouvert tant que le doigt est posé ;
-  - *Interrupteur* : un appui ouvre, l'appui suivant ferme.
-- **Trois formes de fenêtre** : cercle collé au poinçon caméra, carré aux coins
-  arrondis, ovale vertical.
-- **Quatre cadres** : bleu festonné (miroir de poche), bleu lisse, doré, ou
-  aucun cadre. Les festons ne s'appliquent qu'à la forme cercle.
-- **Ajustements fins** : décalage horizontal et vertical de la popup par
-  rapport au poinçon caméra, taille de la popup de 180 à 380 dp.
-- **Écran maintenu allumé** tant que le miroir est ouvert
-  (`FLAG_KEEP_SCREEN_ON`, sans wakelock ni permission supplémentaire).
-- **Aucune connexion réseau** : l'application ne déclare même pas la permission
-  `INTERNET`. Les images de la caméra ne sortent jamais de l'appareil.
+- **Instant mirror**: the front camera opens over the lock screen, full frame,
+  without leaving the locked session.
+- **Discreet, customisable button**: free position (drag and drop), 36–84 dp
+  size, 20–100 % opacity.
+- **Two opening modes**:
+  - *Hold*: the mirror stays open while your finger is down;
+  - *Toggle*: one tap opens, the next one closes.
+- **Three window shapes**: circle glued to the camera cutout, rounded square,
+  tall oval.
+- **Four frames**: scalloped blue (pocket mirror), smooth blue, gold, or none.
+  Scallops only apply to the circle shape.
+- **Fine tuning**: horizontal and vertical offset of the popup from the camera
+  cutout, popup size from 180 to 380 dp.
+- **Screen kept on** while the mirror is open (`FLAG_KEEP_SCREEN_ON`, no
+  wakelock and no extra permission).
+- **No network access at all**: the app does not even declare the `INTERNET`
+  permission. Camera images never leave the device.
 
-## Comment ça marche
+## How it works
 
-L'application repose sur un **service d'accessibilité** (`AccessibilityService`),
-seul moyen pour une application Android d'afficher une fenêtre au-dessus de
-l'écran de verrouillage. Ce service :
+The app relies on an **accessibility service** (`AccessibilityService`), the
+only way for an Android app to draw a window above the lock screen. The service:
 
-1. affiche le bouton flottant (`TYPE_ACCESSIBILITY_OVERLAY`) ;
-2. crée, à l'ouverture, une seconde fenêtre d'overlay contenant un `PreviewView`
-   CameraX ;
-3. découpe la preview selon la forme choisie et dessine le cadre autour
-   (`MaskedMirrorContainer`), avec une animation « sortie du poinçon caméra » ;
-4. relâche la caméra et retire la fenêtre à la fermeture.
+1. displays the floating button (`TYPE_ACCESSIBILITY_OVERLAY`);
+2. creates a second overlay window, containing a CameraX `PreviewView`, when the
+   mirror opens;
+3. clips the preview to the chosen shape and paints the frame around it
+   (`MaskedMirrorContainer`), with a “growing out of the camera cutout” animation;
+4. releases the camera and removes the window on close.
 
-Le service se pré-chauffe (`ProcessCameraProvider`) pour que l'ouverture soit
-immédiate. La configuration circule via `SharedPreferences` et un broadcast
-interne (`ACTION_PREFS_CHANGED`), ce qui applique les réglages au miroir déjà
-ouvert.
+The service pre-warms `ProcessCameraProvider` so that opening is immediate.
+Settings travel through `SharedPreferences` and an internal broadcast
+(`ACTION_PREFS_CHANGED`), so changes apply to the mirror even while it is open.
 
-## Ce que le service d'accessibilité fait — et ne fait pas
+## What the accessibility service does — and does not do
 
-Un service d'accessibilité est puissant par nature, et c'est la raison pour
-laquelle Android affiche un avertissement. Voici son périmètre exact dans
-PocketMirror, vérifiable dans le code et dans
-`app/src/main/res/xml/accessibility_service_config.xml` :
+An accessibility service is powerful by nature, which is why Android shows a
+warning. Here is its exact scope in PocketMirror, verifiable in the code and in
+`app/src/main/res/xml/accessibility_service_config.xml`:
 
-| Ne fait pas | Preuve |
+| It does **not** | Proof |
 |---|---|
-| Ne lit **pas** le contenu des fenêtres | `android:canRetrieveWindowContent="false"` |
-| Ne lit pas le texte affiché, les champs de saisie ou les mots de passe | aucune utilisation de `event.source` ni de `getNodeInfo()` |
-| Ne reçoit pas les frappes clavier | `requestFilterKeyEvents=false` |
-| Ne capture pas les gestes de l'utilisateur | `captureFingerprintGestures=false`, aucun `onGesture` |
-| N'active pas l'exploration tactile | `requestTouchExplorationMode=false` |
-| N'a aucun accès réseau | pas de permission `INTERNET` dans le manifeste |
+| Read window content | `android:canRetrieveWindowContent="false"` |
+| Read on-screen text, input fields or passwords | no use of `event.source` or `getNodeInfo()` |
+| Receive key events | `requestFilterKeyEvents=false` |
+| Capture user gestures | `captureFingerprintGestures=false`, no `onGesture` |
+| Enable touch exploration | `requestTouchExplorationMode=false` |
+| Access the network | no `INTERNET` permission in the manifest |
 
-Seul événement demandé : `TYPE_WINDOW_STATE_CHANGED` (verrouillage /
-déverrouillage). Il sert uniquement de signal de rafraîchissement — le service
-appelle `KeyguardManager` pour savoir si l'écran est verrouillé, sans jamais
-inspecter la fenêtre notifiée.
+The only event it subscribes to is `TYPE_WINDOW_STATE_CHANGED` (lock/unlock). It
+is used purely as a refresh signal: the service asks `KeyguardManager` whether
+the screen is locked, and never inspects the notified window.
 
-Autrement dit, le service ne « voit » pas l'écran : il obtient le droit
-d'afficher une fenêtre au-dessus du verrouillage, et rien de plus.
+In other words, the service does not “see” the screen: it is granted the right
+to draw a window above the lock screen, and nothing more.
 
-### Désactiver ou désinstaller proprement
+### Disable or uninstall cleanly
 
-**Désactiver le service** (l'app reste installée, le bouton disparaît
-immédiatement) :
-Paramètres → **Accessibilité** → **PocketMirror (Écran verrouillé)** →
-désactiver.
+**Disable the service** (the app stays installed, the button disappears
+immediately):
+Settings → **Accessibility** → **PocketMirror (Écran verrouillé)** → turn off.
 
-**Désinstaller** :
+**Uninstall**:
 
-1. désactiver d'abord le service comme ci-dessus ;
-2. puis Paramètres → **Applications** → **PocketMirror** → **Désinstaller**
-   (ou appui long sur l'icône → Désinstaller).
+1. disable the service as above;
+2. then Settings → **Apps** → **PocketMirror** → **Uninstall** (or long-press
+   the icon → Uninstall).
 
-Android retire de toute façon l'autorisation d'accessibilité à la
-désinstallation ; passer par la désactivation évite simplement de laisser une
-entrée orpheline dans la liste des services. Les préférences sont stockées dans
-le dossier privé de l'application et disparaissent avec elle — rien n'est
-conservé ailleurs.
+Android revokes the accessibility permission on uninstall anyway; disabling
+first simply avoids leaving an orphan entry in the services list. Preferences
+live in the app's private storage and are removed with it — nothing is kept
+elsewhere.
 
-## Réglages disponibles
+## Settings
 
-| Réglage | Valeurs |
+| Setting | Values |
 |---|---|
-| Mode d'ouverture | Maintenir appuyé / Interrupteur |
-| Forme de la popup | Cercle / Carré arrondi / Ovale vertical |
-| Cadre | Bleu festonné / Bleu lisse / Doré / Aucun |
-| Hauteur de la popup | −40 à +200 dp par rapport au poinçon |
-| Décalage horizontal | −120 à +120 dp |
-| Taille de la popup | 180 à 380 dp |
-| Taille du bouton | 36 à 84 dp |
-| Transparence du bouton | 20 à 100 % |
+| Opening mode | Hold / Toggle |
+| Popup shape | Circle / Rounded square / Tall oval |
+| Frame | Scalloped blue / Smooth blue / Gold / None |
+| Popup height | −40 to +200 dp from the camera cutout |
+| Horizontal offset | −120 to +120 dp |
+| Popup size | 180 to 380 dp |
+| Button size | 36 to 84 dp |
+| Button opacity | 20 to 100 % |
 
-## Compiler depuis les sources
+## Build from source
 
-Prérequis : **JDK 17** et **Android SDK 36** (Android Studio, ou uniquement la
-ligne de commande).
+Requirements: **JDK 17** and **Android SDK 36** (Android Studio, or the command
+line only).
 
 ```bash
 git clone https://github.com/TalaourarAli/PocketMirror.git
 cd PocketMirror
-./gradlew :app:assembleDebug          # APK de debug, installable directement
+./gradlew :app:assembleDebug          # debug APK, installable as-is
 ```
 
-Windows :
+Windows:
 
 ```powershell
 .\gradlew.bat :app:assembleDebug
 ```
 
-APK produit : `app/build/outputs/apk/debug/app-debug.apk`, à installer avec :
+Output: `app/build/outputs/apk/debug/app-debug.apk`, installable with:
 
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-> Le SDK Android doit être trouvé par Gradle : soit via la variable
-> d'environnement `ANDROID_HOME`, soit via `local.properties`
-> (`sdk.dir=/chemin/vers/Android/Sdk`). Ce fichier n'est pas versionné.
+> Gradle must find the Android SDK: either through the `ANDROID_HOME`
+> environment variable, or through `local.properties`
+> (`sdk.dir=/path/to/Android/Sdk`). That file is not committed.
 
-## Signature de la release
+## Release signing
 
-Cette section concerne **uniquement** la publication d'une version pour les
-autres. Pour un usage personnel, l'APK de debug suffit.
+This section only matters if you publish builds for other people. For personal
+use, the debug APK is enough.
 
-Le fichier `keystore.properties` n'est **pas** versionné (il contient les mots
-de passe). Sans lui, `assembleRelease` produit un APK **non signé**, et Gradle
-affiche un avertissement. Pour signer localement, créez à la racine :
+`keystore.properties` is **not** committed (it holds the passwords). Without it,
+`assembleRelease` produces an **unsigned** APK and Gradle prints a warning. To
+sign locally, create the file at the repository root:
 
 ```properties
-storeFile=chemin/vers/pocketmirror.jks
+storeFile=path/to/pocketmirror.jks
 storePassword=...
 keyAlias=pocketmirror
 keyPassword=...
 ```
 
-Puis générez un keystore si nécessaire :
+Generate a keystore if you do not have one yet:
 
 ```bash
 keytool -genkeypair -v -keystore pocketmirror.jks -alias pocketmirror \
         -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-> ⚠️ **Conservez ce fichier et ses mots de passe.** C'est la seule chose
-> irremplaçable du projet : une clé perdue ou changée oblige les utilisateurs à
-> désinstaller l'application (et à perdre leurs réglages) pour installer une
-> mise à jour.
+> ⚠️ **Back this file up, along with its passwords.** It is the only
+> irreplaceable part of the project: a lost or changed key forces users to
+> uninstall the app (and lose their settings) before they can install an update.
 
-## Intégration continue et releases
+## CI and releases
 
-| Workflow | Déclencheur | Ce qu'il fait |
+| Workflow | Trigger | What it does |
 |---|---|---|
-| `.github/workflows/android.yml` | push sur `main`, pull request, manuel | `assembleDebug` + `lintDebug`, APK de debug en artefact. **Ne publie rien.** |
-| `.github/workflows/release.yml` | **manuel uniquement** | Construit l'APK de release, le signe si les secrets existent, et crée une GitHub Release avec notes générées et APK attaché |
+| `.github/workflows/android.yml` | push to `main`, pull request, manual | `assembleDebug` + `lintDebug`, debug APK as an artifact. **Publishes nothing.** |
+| `.github/workflows/release.yml` | **manual only** | Builds the release APK, signs it if the secrets exist, and creates a GitHub Release with generated notes and the APK attached |
 
-Pousser du code ne publie rien, et pousser un tag ne publie rien non plus :
-c'est volontaire. Pour publier, deux chemins possibles, exclusifs.
+Pushing code publishes nothing, and pushing a tag publishes nothing either:
+that is intentional. To publish, pick one of two mutually exclusive paths.
 
-### Option A — signature locale (par défaut)
+### Option A — local signing (default)
 
-Le keystore reste sur votre machine, il n'est jamais transmis à GitHub.
+The keystore stays on your machine and is never sent to GitHub.
 
-1. Mettre à jour `versionCode` et `versionName` dans `app/build.gradle.kts`.
-2. Commiter, puis taguer avec le même numéro :
+1. Update `versionCode` and `versionName` in `app/build.gradle.kts`.
+2. Commit, then tag with the same number:
 
    ```bash
    git tag -a v1.8 -m "Version 1.8 (versionCode 8)"
@@ -210,32 +202,31 @@ Le keystore reste sur votre machine, il n'est jamais transmis à GitHub.
    git push origin v1.8
    ```
 
-3. Construire l'APK signé en local :
+3. Build the signed APK locally:
 
    ```bash
    ./gradlew :app:assembleRelease
    ```
 
-4. Sur GitHub : **Releases → Draft a new release**, choisir le tag `v1.8`,
-   puis joindre `app/build/outputs/apk/release/app-release.apk`
-   (renommé `PocketMirror-v1.8.apk` si vous voulez suivre la convention des
-   releases publiées par le workflow).
+4. On GitHub: **Releases → Draft a new release**, pick the `v1.8` tag, then
+   attach `app/build/outputs/apk/release/app-release.apk` (renamed
+   `PocketMirror-v1.8.apk` if you want to match the naming used by the
+   workflow).
 
-### Option B — signature dans GitHub Actions (facultatif)
+### Option B — signing in GitHub Actions (optional)
 
-Le workflow `Release` peut signer et publier lui-même, lancé à la main depuis
-**Actions → Release → Run workflow**. Dans ce cas, le keystore est stocké dans
-les secrets du dépôt. À ajouter dans **Settings → Secrets and variables →
-Actions** :
+The `Release` workflow can sign and publish by itself, started manually from
+**Actions → Release → Run workflow**. In that case the keystore is stored in the
+repository secrets. Add them in **Settings → Secrets and variables → Actions**:
 
-| Secret | Contenu |
+| Secret | Content |
 |---|---|
-| `KEYSTORE_BASE64` | le keystore encodé en base64 (voir ci-dessous) |
-| `KEYSTORE_PASSWORD` | mot de passe du keystore (`storePassword`) |
-| `KEY_ALIAS` | alias de la clé (`keyAlias`) |
-| `KEY_PASSWORD` | mot de passe de la clé (`keyPassword`) |
+| `KEYSTORE_BASE64` | the keystore encoded in base64 (see below) |
+| `KEYSTORE_PASSWORD` | keystore password (`storePassword`) |
+| `KEY_ALIAS` | key alias (`keyAlias`) |
+| `KEY_PASSWORD` | key password (`keyPassword`) |
 
-Encodage du keystore :
+Encoding the keystore:
 
 ```bash
 base64 -w0 pocketmirror.jks > keystore.b64   # Linux
@@ -246,53 +237,50 @@ base64 -i pocketmirror.jks -o keystore.b64   # macOS
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("pocketmirror.jks")) | Set-Content keystore.b64
 ```
 
-> 🧹 **Supprimez `keystore.b64` juste après l'avoir collé dans GitHub Secrets.**
-> Ce fichier contient votre clé privée encodée, pas chiffrée : il ne doit jamais
-> être commité ni laissé dans le dossier du projet. `.gitignore` ignore
-> désormais `*.b64`, mais ne comptez pas uniquement sur lui.
+> 🧹 **Delete `keystore.b64` right after pasting it into GitHub Secrets.** That
+> file holds your private key encoded, not encrypted: it must never be committed
+> or left in the project folder. `.gitignore` now ignores `*.b64`, but do not
+> rely on it alone.
 
-> ⚠️ Le keystore doit être **celui utilisé pour les versions déjà installées**.
-> Un APK signé avec une autre clé ne peut pas mettre à jour l'application : il
-> faut désinstaller, ce qui efface les réglages.
+> ⚠️ The keystore must be **the one used for the versions already installed**.
+> An APK signed with a different key cannot update the app: users would have to
+> uninstall, which erases their settings.
 
-Sans secrets configurés, l'option B produit un APK **non signé**, qu'Android
-refuse d'installer par-dessus une version existante. Dans ce cas, utilisez
-l'option A.
+Without the secrets, option B produces an **unsigned** APK, which Android
+refuses to install over an existing version. In that case, use option A.
 
-## Structure du projet
+## Project structure
 
 ```
 app/src/main/java/com/pocketmirror/app/
-├── MainActivity.kt                         # écran de réglages
-├── ButtonPositionActivity.kt               # glisser-déposer du bouton
-├── LockScreenMirrorAccessibilityService.kt # overlays, caméra, animations
-├── MaskedMirrorContainer.kt                # découpe + cadre dessiné
+├── MainActivity.kt                         # settings screen
+├── ButtonPositionActivity.kt               # drag-and-drop button placement
+├── LockScreenMirrorAccessibilityService.kt # overlays, camera, animations
+├── MaskedMirrorContainer.kt                # clipping + drawn frame
 ├── MirrorPrefs.kt                          # SharedPreferences + broadcast
 └── MirrorStyle.kt                          # InteractionMode, MirrorShape, MirrorFrame
 ```
 
-## Vie privée
+## Privacy
 
-L'application ne dispose d'aucune permission réseau et n'envoie aucune donnée.
-La caméra est utilisée uniquement pour l'aperçu local, pendant que le miroir est
-ouvert. Les préférences restent dans le stockage privé de l'application.
+The app has no network permission and sends no data. The camera is used only for
+the local preview while the mirror is open. Settings are stored in the app's
+private storage.
 
-Aucun analytics, aucun crash reporter, aucune bibliothèque publicitaire.
+No analytics, no crash reporting, no ad libraries.
 
-## Limitations connues
+## Known limitations
 
-- Le service d'accessibilité est indispensable : sans lui, impossible d'afficher
-  une fenêtre sur l'écran de verrouillage avec les API publiques d'Android.
-- En mode *Interrupteur*, le miroir peut rester ouvert indéfiniment, et l'écran
-  reste allumé tant qu'il est visible.
-- **Pages mémoire de 16 Ko (Android 16 et plus)** : Android peut allouer la
-  mémoire par blocs de 16 Ko au lieu de 4 Ko, et une bibliothèque native
-  compilée pour l'ancienne taille ne fonctionne alors plus. CameraX embarque
-  deux petites bibliothèques de ce type ; elles sont **exclues** du build pour
-  éviter l'avertissement au démarrage. Conséquence concrète : quelques
-  optimisations d'image optionnelles sont désactivées, l'aperçu du miroir
-  fonctionne normalement.
+- The accessibility service is mandatory: public Android APIs cannot draw over
+  the lock screen.
+- In toggle mode the mirror can stay open indefinitely, and the screen stays on
+  while it is visible.
+- **16 KB memory pages (Android 16 and newer)**: Android can allocate memory in
+  16 KB blocks instead of 4 KB, which breaks native libraries built for the old
+  size. CameraX ships two such small libraries; they are **excluded** from the
+  build to avoid the startup warning. Practical consequence: a few optional
+  image optimisations are disabled, and the mirror preview works normally.
 
-## Licence
+## License
 
-Distribué sous licence MIT. Voir [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
