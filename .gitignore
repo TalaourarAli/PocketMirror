@@ -5,6 +5,7 @@ local.properties
 keystore.properties
 *.keystore
 *.jks
+*.b64
 *.iml
 .idea/
 captures/
